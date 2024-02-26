@@ -1,11 +1,53 @@
+install.packages(c("rcompanion", "ltm"))
 # Install packages of example datasets
 install.packages("datasauRus")
+#
+install.packages("plotly")
 # Load packages of data process
-#library(dplyr)
+library(dplyr)
 # Load packages of example datasets
 library(datasauRus)
 # Load packages of visualization
 library(ggplot2)
+
+# Review of Descriptive Statistics
+xn <- round(rnorm(100, 100, 15))
+xc <- rbinom(100, 1, .6)
+## Univariate Descriptive Statistics
+### Central Tendency of a numerical data
+mean(xn) # mean
+median(xn) # median
+quantile(xn, c(.0, .25, .5, .75, 1.)) # quartiles
+# To my best knowledge, R does not provide MODE function
+data_mode <- function(x) {
+  tx <- table(xn)
+  return(as.numeric(names(tx)[which.max(tx)]))
+}
+data_mode(xn) # mode
+### Variability of a numerical data
+var(xn) # variance
+sd(xn) # standard deviation
+diff(range(xn)) # range
+IQR(xn) # interquartile range
+### High order statistics of a numerical data
+e1071::skewness(xn) # skewness
+e1071::kurtosis(xn) # kurtosis
+### Frequency table for categorical data
+table(xc)
+## Bivariate Descriptive Statistics
+### Common correlations between two numerical, ordinal categorial data
+yn <- xn + rnorm(100, 0, 10)
+cor(xn, yn, method = "pearson")
+cor(xn, yn, method = "kendall")
+cor(xn, yn, method = "spearman")
+### Cramer's V Correlation between two nominal categorical data
+yc <- rbinom(100, 2, .7)
+library(rcompanion)
+cramerV(xtabs(~ yc + xc))
+### Point-biserial Correlation between numerical and binary data
+library(ltm)
+biserial.cor(xn, xc, use = c("all.obs"), level = length(unique(xc)))
+
 
 # Descriptive Statistics and Graphs of datasauRus datasets
 library(datasauRus)
@@ -91,3 +133,370 @@ for (i in 1:ncol(datasauRus::box_plots)) {
           main = box_plots_names[i])
 }
 par(mfrow = c(1, 1))
+
+#
+set.seed(1)
+n <- 1e+02
+y <- as.factor(sample(LETTERS[1:4], n, replace=T, prob=c(0.1, 0.1, 0.5, 0.3)))
+x1 <- rnorm(n)
+x2 <- rbeta(n, 0.5, 0.5)
+xydata <- data.frame(y, x1, x2)
+par(mfrow=c(1,4))
+boxplot(x1~y, data=xydata, ylab="x1", main="boxplot")
+hist(x2, xlab="x2", main="hist")
+barplot(table(y), xlab="y", col = 2:5, main="barplot")
+plot(x1, x2, main="plot", col=as.integer(y)+1)
+par(mfrow=c(1,1))
+
+
+# Histograms
+library(ggplot2)
+set.seed(1)
+exp_data <- data.frame(x = rexp(1000, 0.1))
+ggplot(exp_data) +
+  geom_histogram( aes(x = x), binwidth = 0.5 ) +
+  labs(title = "binwidth = 0.5")
+ggplot(exp_data) +
+  geom_histogram( aes(x = x), binwidth = 2 ) +
+  labs(title = "binwidth = 2")
+ggplot(exp_data) +
+  geom_histogram( aes(x = x), binwidth = 20 ) +
+  labs(title = "binwidth = 20")
+
+
+data(iris)
+
+ggplot(iris) +
+  geom_histogram( aes(x = iris[,1]), binwidth = 0.2) +
+  labs(x = names(iris)[1])
+
+ggplot(iris) +
+  geom_histogram( aes(
+    x = iris[,1], 
+    y = after_stat(density), 
+    fill = Species
+  ), binwidth = 0.2) +
+  labs(x = names(iris)[1])
+
+
+ggplot(iris) +
+  geom_histogram( aes(
+    x = iris[,1], 
+    y = after_stat(density), 
+    fill = Species
+  ), binwidth = 0.2, alpha = 0.6, position = 'identity') +
+  scale_fill_manual(values = c("#F8766D", "#00BA38", "#619CFF")) +
+  labs(x = names(iris)[1])
+
+
+ggplot(iris) +
+  geom_histogram( aes(
+    x = iris[,1], 
+    y = after_stat(density), 
+    fill = Species
+  ), binwidth = 0.2, alpha = 0.6, position = 'identity') +
+  scale_fill_manual(values = c("#F8766D", "#00BA38", "#619CFF")) +
+  geom_density( aes(x = iris[,1], fill = Species), alpha = .3) +
+  labs(x = names(iris)[1])
+
+#
+data(iris)
+ggplot(iris) +
+  geom_boxplot( aes(
+    y = iris[,1]
+  )) +
+  labs(y = names(iris)[1]) +
+  theme(
+    axis.text.x = element_blank(), 
+    axis.ticks.x = element_blank()
+  )
+
+ggplot(iris) +
+  geom_boxplot( aes(
+    x = Species,
+    y = iris[,1]
+  )) +
+  labs(y = names(iris)[1])
+
+ggplot(iris) +
+  geom_violin( aes(
+    x = Species,
+    y = iris[,1]
+  )) +
+  labs(y = names(iris)[1])
+
+data(mtcars)
+mtcars$am <- as.factor(mtcars$am)
+mtcars$cyl <- as.factor(mtcars$cyl)
+ggplot(mtcars) +
+  geom_boxplot( aes(
+    x = cyl,
+    y = disp,
+    fill = am
+  )) +
+  labs(y = "disp")
+
+#
+data(mtcars)
+mtcars$am <- as.factor(mtcars$am)
+mtcars$cyl <- as.factor(mtcars$cyl)
+# Direct draw bar plot using stat = "count"
+ggplot(mtcars) + 
+  geom_bar(
+    aes(x = cyl),
+    position = "identity", stat = "count"
+  )
+# Create frequency table fist
+library(dplyr)
+mtcars_freq_table <- mtcars %>%
+  group_by(cyl) %>%
+  summarise(counts = n()) 
+# Then draw bar plot using stat = "identity"
+ggplot(mtcars_freq_table) +  
+  geom_bar(
+    aes(x = cyl, y = counts),
+    position = "identity", stat = "identity"
+  )
+
+#
+library(dplyr)
+mtcars_freq_table_2 <- mtcars %>%
+  group_by(cyl, am) %>%
+  summarise(counts = n()) 
+
+ggplot(mtcars_freq_table_2) + 
+  geom_bar(
+    aes(x = cyl, y = counts, fill = am),
+    position = "dodge", stat="identity"
+  )
+
+#
+
+
+data(longley)
+library(ggplot2)
+ggplot(longley) +
+  geom_line(
+    aes(x = 1:nrow(longley), y = GNP.deflator)
+  ) +
+  scale_x_continuous(
+    breaks = 1:nrow(longley), 
+    labels = rownames(longley)
+  ) +
+  labs(x = "Year", y = "GNP.deflator")
+
+
+
+#
+data(iris)
+library(ggplot2)
+ggplot(iris, aes(x = iris[,1], y = iris[,2])) +
+  geom_point() +
+  labs(x = names(iris)[1], y = names(iris)[2])
+ggplot(iris, aes(x = iris[,1], y = iris[,2], color = Species)) +
+  geom_point() +
+  labs(x = names(iris)[1], y = names(iris)[2])
+#
+library(ggplot2)
+library(gridExtra)
+# Draw scatter plots for Iris dataset
+iris_scatter_plot <- function(i, j) {
+  ggplot(iris, aes(x = iris[,i], y = iris[,j], color = Species)) +
+    geom_point() +
+    labs(x = names(iris)[i], y = names(iris)[j])
+}
+scatter_plots <- vector("list", 16)
+counter <- 1
+for (i in 1:4) {
+  for (j in 1:4) {
+    scatter_plots[[counter]] <- iris_scatter_plot(i, j)
+    counter <- counter + 1
+  }
+}
+marrangeGrob(scatter_plots, nrow = 4, ncol = 4, top = "")
+# Or
+library(ggplot2)
+library(GGally)
+ggpairs(iris, aes(colour = Species, alpha = 0.4))
+#
+
+library(reshape2)
+reshape2::melt(AirPassengers, id.vars = x(xname, yname))
+
+data(AirPassengers)
+xname <- colnames(AirPassengers)
+yname <- rownames(AirPassengers)
+
+AirPassengers_long <- data.frame(matrix(nrow = prod(dim(AirPassengers)), ncol = 3))
+counter <- 1
+for (i in 1:length(xname)) {
+  for (j in 1:length(yname)) {
+    AirPassengers_long[counter,] <- c(xname[i], yname[j], AirPassengers[counter])
+    counter <- counter + 1
+  }
+}
+ggplot(AirPassengers, aes(xname, yname, fill= AirPassengers))
+
+
+# Reshape matrix to long data
+volcano_long_num <- data.frame(
+  x = rep(1:ncol(volcano), each = nrow(volcano)), 
+  y = rep(1:nrow(volcano), time = ncol(volcano)), 
+  value = as.vector(volcano)
+)
+# Draw contour
+ggplot(volcano_long_num) +
+  geom_contour(aes(x, y, z = value)) 
+# Add color to the contour plot
+ggplot(volcano_long_num) +
+  geom_contour(aes(x, y, z = value), colour = "white") +
+  geom_contour_filled(aes(x, y, z = value))  
+
+#
+# Reshape matrix to long data
+data(volcano)
+volcano_long_fac <- data.frame(
+  x = as.factor(rep(1:ncol(volcano), each = nrow(volcano))), 
+  y = as.factor(rep(1:nrow(volcano), time = ncol(volcano))), 
+  value = as.vector(volcano)
+)
+
+ggplot(volcano_long_fac) +
+  geom_tile(aes(x, y, fill = value)) +
+  scale_fill_distiller(palette = "Spectral") +
+  theme(
+    axis.text.x = element_blank(), 
+    axis.ticks.x = element_blank(), 
+    axis.text.y = element_blank(), 
+    axis.ticks.y = element_blank()
+  )
+
+
+# Default bins
+gp2 <- ggplot(volcano_long_fac) +
+  geom_tile(aes(x, y, fill = value)) +
+  #scale_fill_distiller(palette = "Spectral") +
+  theme(
+    axis.text.x = element_blank(), 
+    axis.ticks.x = element_blank(), 
+    axis.text.y = element_blank(), 
+    axis.ticks.y = element_blank()
+  )
+library(plotly)
+fig <- ggplotly(gp2)
+fig
+
+#
+iris_cor <- cor(iris[1:4])
+round(iris_cor[c(3,4,1,2),c(3,4,1,2)]*100, 2)
+iris_cor_long <- data.frame(
+  x1 = rep(colnames(iris_cor), each = length(rownames(iris_cor))),
+  x2 = rep(rownames(iris_cor), time = length(colnames(iris_cor))),
+  corr = as.vector(iris_cor)
+)
+
+ggplot(iris_cor_long) +
+  geom_tile(aes(x1, x2, fill = corr)) +
+  scale_fill_distiller(
+    palette = "RdBu", limits = c(-1, 1)
+  ) 
+
+#
+
+
+n <- 1e+04
+x1 <- rnorm(n, mean = -1, sd = 1)
+y1 <- rnorm(n, mean = -1, sd = 1)
+x2 <- rnorm(n, mean = 2, sd = 1)
+y2 <- rnorm(n, mean = 2, sd = 1)
+
+par(mfrow=c(1, 2))
+# Original scatter plot
+plot(x1, y1, main="black")
+# Smoothed scatter plot
+smoothScatter(
+  x1, y1, 
+  col = "black", 
+  colramp=colorRampPalette(c("white", "black")),
+  main = 'Smoothed by Color Ramp'
+)
+par(mfrow=c(1, 1))
+
+#
+
+pl <- c(-6, 6)
+color_ramp_1 <- colorRampPalette(c("white", "#00BA38"))
+color_ramp_2 <- colorRampPalette(c("white", "#619CFF"))
+transparency_1 <- colorRampPalette(
+  c(adjustcolor("white", alpha.f = .3), "#00BA38"), alpha = TRUE
+)
+transparency_2 <- colorRampPalette(
+  c(adjustcolor("white", alpha.f = .3), "#619CFF"), alpha = TRUE
+)
+par(mfrow = c(1, 3))
+# Original Scatterplot of Two Groups
+plot(x1, y1, col = "#00BA38", xlim = pl, ylim = pl, main = "scatterplot")
+points(x2, y2, col = "#619CFF")
+# Smooth Scatters of Two Groups Without Transparency
+smoothScatter(x1, y1, col = "black", colramp = color_ramp_1,
+              xlim = pl, ylim = pl, main = 'no transparency')
+smoothScatter(x2, y2, col = "black", colramp = color_ramp_2, add = TRUE)
+# Smooth Scatters of Two Groups With Transparency
+smoothScatter(x1, y1, col="black", colramp = transparency_1,
+              xlim = pl, ylim = pl, main = "with transparency")
+smoothScatter(x2, y2, col="black", colramp = transparency_2, add = TRUE)
+par(mfrow = c(1, 1))
+
+#
+large_data <- data.frame(
+  x1 = x1, x2 = x2, y1 = y1, y2 = y2
+)
+ggplot(large_data) +
+  geom_point(aes(x = x1, y = y1))
+plot(large_data$x1, large_data$y1, xlab = "x1", ylab = "y1", main = "Original Scatterplot")
+# Default bins
+ggplot(large_data) +
+  geom_hex(aes(x1, y1))
+# User-defined bins
+ggplot(large_data) +
+  geom_hex(aes(x1, y1), bins = 10) +
+  scale_fill_distiller(palette = "Reds") 
+
+#
+library(ggplot2)
+# Default bins
+gp2 <- ggplot(large_data) +
+          geom_hex(aes(x1, y1))
+library(plotly)
+fig <- ggplotly(gp2)
+fig
+# 
+library(plotly)
+data(iris)
+fig <- plot_ly(x = iris$Species, y = iris[,1], type = "box")
+fig <- layout(fig,
+              xaxis = list(title = ''), 
+              yaxis = list(title = names(iris)[1]) )
+fig
+#
+library(dplyr)
+library(plotly)
+data(mtcars)
+mtcars$am <- as.factor(mtcars$am)
+mtcars$cyl <- as.factor(mtcars$cyl)
+fig <- plot_ly(
+  x = mtcars$cyl, y = mtcars$disp, color = mtcars$am, type = "box"
+  ) %>% layout(
+    boxmode = "group", 
+    xaxis = list(title = 'cyl'), 
+    yaxis = list(title = 'disp')
+  )
+fig
+#
+
+library(plotly)
+fig <- plot_ly(
+  z = volcano, type = "heatmap",
+  colors = "Blues"
+)
+fig
