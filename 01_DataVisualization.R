@@ -1,8 +1,8 @@
-install.packages(c("rcompanion", "ltm"))
+#install.packages(c("rcompanion", "ltm"))
 # Install packages of example datasets
-install.packages("datasauRus")
+#install.packages("datasauRus")
 #
-install.packages("plotly")
+#install.packages("plotly")
 # Load packages of data process
 library(dplyr)
 # Load packages of example datasets
