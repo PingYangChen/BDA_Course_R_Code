@@ -1,11 +1,13 @@
 #
 library(ggplot2)
 library(GGally)
+library(regclass)
 #
 library(glmnet)
 library(gglasso)
-#devtools::install_github("DataSlingers/ExclusiveLasso")
-#library(ExclusiveLasso)
+library(sparsegl)
+#
+library(pls)
 #
 library(SIS)
 #
@@ -19,6 +21,10 @@ credit_data$Married <- as.factor(credit_data$Married)
 credit_data$Region <- as.factor(credit_data$Region)
 #
 head(credit_data, 4)
+# Examine for multicollinearity
+mdl <- lm(Balance ~ Age + Limit + Rating, 
+          data = credit_data)
+VIF(mdl)
 # Stepwise regression
 lm_null <- lm(Balance ~ 1, data = credit_data)
 lm_full <- lm(Balance ~ ., data = credit_data)
@@ -42,12 +48,23 @@ mb <- step(lm_full, scope = list(lower = lm_null, upper = lm_full),
 m2 <- step(lm_null, scope = list(lower = lm_null, upper = lm_full), 
            direction = "both", k = bic_param)
 
+summary(mf)
+summary(mb)
+summary(m2)
+
 # Regularization
-modelmat <- model.matrix(Balance ~ ., data = credit_data)[,-1]
+names(credit_data)
+# Create model matrix
+modelmat <- model.matrix(Balance ~ ., data = credit_data)[,-1] # Remove intercept part
+colnames(modelmat)
 y <- credit_data$Balance
+head(modelmat, 6)
 # Ridge
-rid_cv <- cv.glmnet(modelmat, y, family = "gaussian", alpha = 0)
+rid_cv <- cv.glmnet(modelmat, y, family = "gaussian", alpha = 0)#,
+                    #lambda = exp(seq(-3, 1, length = 100)))
 names(rid_cv)
+plot(rid_cv$lambda, rid_cv$cvm, type = "l")
+rid_cv$lambda.min
 rid_cv$lambda.1se
 m_rid <- glmnet(modelmat, y, family = "gaussian", alpha = 0,
                 lambda = rid_cv$lambda.1se)
@@ -55,6 +72,7 @@ m_rid$a0
 m_rid$beta
 # Lasso
 las_cv <- cv.glmnet(modelmat, y, family = "gaussian", alpha = 1)
+plot(las_cv$lambda, las_cv$cvm, type = "l")
 las_cv$lambda.min
 las_cv$lambda.1se
 m_las <- glmnet(modelmat, y, family = "gaussian", alpha = 1,
@@ -62,38 +80,28 @@ m_las <- glmnet(modelmat, y, family = "gaussian", alpha = 1,
 m_las$a0
 m_las$beta
 # Elastic net
-en_cv <- cv.glmnet(modelmat, y, family = "gaussian", alpha = 0.5)
+en_cv <- cv.glmnet(modelmat, y, family = "gaussian", alpha = 0.3)
+plot(en_cv$lambda, en_cv$cvm, type = "l")
 en_cv$lambda.min
 en_cv$lambda.1se
-m_en <- glmnet(modelmat, y, family = "gaussian", alpha = 0.5,
+m_en <- glmnet(modelmat, y, family = "gaussian", alpha = 0.3,
                 lambda = en_cv$lambda.1se)
 m_en$a0
 m_en$beta
-# Group lasso
-# library(gglasso)
-colnames(modelmat)
-xgroup <- c(1, 1, 1, 1, 2, 2, 3, 2, 2, 3, 3)
-glas_cv <- cv.gglasso(modelmat, y, group = xgroup, loss = "ls")
-glas_cv$lambda.min
-glas_cv$lambda.1se
-m_glas <- gglasso(modelmat, y, group = xgroup, loss = "ls",
-                  lambda = glas_cv$lambda.1se)
-m_glas$b0
-m_glas$beta
 
 # Group lasso application to modeling 2fi
-# library(gglasso)
-modelmat2fi <- model.matrix(Balance ~ (.)^2, data = credit_data)[,-1]
+names(credit_data)
+modelmat2fi <- model.matrix(
+  Balance ~ . + Income * (Age + Education + Own + Student), data = credit_data
+)[,-1]
 colnames(modelmat2fi)
-twofi_group <- numeric(ncol(modelmat2fi))
-for (i in 1:ncol(modelmat2fi)) {
-  colnames(modelmat2fi)[i]
-  for (j in 1:10) {
-    
-  }
-  names(credit_data)[i]
-}
-twofi_group <- c(1, 1, 1, 1, 2, 2, 3, 2, 2, 3, 3)
+twofi_group <- c(1, 2, 3, 4, 1, 
+                 1, 1, 1, 5, 6, 
+                 6, 1, 1, 1, 1)
+names(twofi_group) <- colnames(modelmat2fi)
+twofi_group
+# Group Lasso: choose best lambda
+# library(gglasso)
 glas_cv <- cv.gglasso(modelmat2fi, y, group = twofi_group, loss = "ls")
 glas_cv$lambda.min
 glas_cv$lambda.1se
@@ -102,20 +110,78 @@ m_glas <- gglasso(modelmat2fi, y, group = twofi_group, loss = "ls",
 m_glas$b0
 m_glas$beta
 
-# Exclusive lasso
-#library(ExclusiveLasso)
-# colnames(modelmat)
-# xgroup <- c(1, 1, 1, 1, 2, 2, 3, 2, 2, 3, 3)
-# elas_cv <- cv.exclusive_lasso(modelmat, y, group = xgroup, family = "gaussian")
-# elas_cv$lambda.min
-# elas_cv$lambda.1se
-# m_elas <- exclusive_lasso(modelmat, y, group = xgroup, family = "gaussian",
-#                           lambda = elas_cv$lambda.1se)
-# m_elas$intercept
-# m_elas$coef
+# Sparse group lasso  application to modeling 2fi
+# Sparse Group Lasso: choose best lambda using CV
+#library(sparsegl)
+sglas_cv <- cv.sparsegl(modelmat2fi, y, group = twofi_group, family = "gaussian",
+                        asparse = 0.05) # set weight of L1-penalty as 0.05
+sglas_cv$lambda.min
+sglas_cv$lambda.1se
+m_sglas <- sparsegl(modelmat2fi, y, group = twofi_group, family = "gaussian",
+                    lambda = sglas_cv$lambda.1se, asparse = 0.05)
+m_sglas$b0
+m_sglas$beta
+
 
 
 # Dimension reduction
+names(credit_data)
+# Create model matrix
+modelmat <- model.matrix(Balance ~ ., data = credit_data)[,-1] # Remove intercept part
+colnames(modelmat)
+#
+pca <- prcomp(modelmat, scale. = TRUE)
+pvars <- (pca$sdev)^2 
+pvars_props <- pvars/sum(pvars)
+pvars_props_cum <- cumsum(pvars_props)
+#
+par(mfrow = c(1, 2), mar = c(5, 4, 4, 1))
+plot(1:length(pca$sdev), (pca$sdev)^2, type = "l", lwd = 3, 
+     xlab = "# of PCs", ylab = "Variance", col = "#555555",
+     axes = FALSE)
+axis(side = 1, at = 1:length(pca$sdev))
+axis(side = 2, at = pretty(range((pca$sdev)^2)))
+points(1:length(pca$sdev), (pca$sdev)^2, pch = 16, cex = 1.2)
+abline(h = 1, col = "black", lty = 2, lwd = 1)
+#
+plot(1:length(pca$sdev), pvars_props_cum, type = "h", 
+     lend = 3, lwd = 20, col = "dodgerblue2",
+     xlab = "# of PCs", ylab = "% variance explained", axes = FALSE)
+axis(side = 1, at = 1:length(pca$sdev))
+axis(side = 2, at = pretty(0:1))
+abline(h = 0.9, col = "navy", lty = 2, lwd = 2)
+#
+n_pcs <- min(which(pvars_props_cum >= 0.9))
+used_pcs <- pca$x[,1:n_pcs]
+colnames(used_pcs) <- paste0("PC", 1:n_pcs)
+credit_pc_data <- data.frame(
+  Balance = credit_data$Balance, used_pcs
+)
+summary(lm(Balance ~ ., data = credit_pc_data))
+#
+
+
+
+# Partial Least Squares
+library(pls)
+m_pls <- plsr(Balance ~ ., data = credit_data, 
+              scale = TRUE, validation = "CV")
+summary(m_pls)
+
+
+# Sure independence screening
+library(SIS)
+modelmat <- model.matrix(Balance ~ ., data = credit_data)[,-1] # Remove intercept part
+y <- credit_data$Balance
+m_sis <- SIS(modelmat, y, family = "gaussian", penalty = "SCAD",
+             tune = "cv", seed = 1) #, varISIS = "vanilla"
+#
+colnames(modelmat)[m_sis$ix]
+modelmat_sis <- modelmat[,m_sis$ix]
+credit_data_sis <- data.frame(cbind(modelmat_sis, Balance = y))
+ggpairs(credit_data_sis)
+
+summary(lm(Balance ~ ., data = credit_data_sis))
 
 
 # Sure independence screening
@@ -135,7 +201,7 @@ head(summary(glm_lkm)$coefficients, 6)
 lkm_x <- model.matrix(V7130 ~ ., data = leukemia.train)[,-1]
 lkm_y <- leukemia.train[,7130]
 sis_lkm <- SIS(lkm_x, lkm_y, family = "binomial", penalty = "lasso",
-               tune = "bic") #, varISIS = "vanilla"
+               tune = "bic", seed = 1) #, varISIS = "vanilla"
 # SIS selected
 colnames(lkm_x)[sis_lkm$ix]
 # [1] "V3320" "V3810"
@@ -148,6 +214,9 @@ glm_lkm_s <- glmnet(x = lkm_x_sis, y = lkm_y,
                     family = "binomial", alpha = 0, lambda = 0)
 glm_lkm_s$a0
 glm_lkm_s$beta
+
+leukemia_sis <- data.frame(cbind(lkm_x_sis, y = lkm_y))
+summary(glm(y ~ ., data = leukemia_sis, family = binomial(link = "logit")))
 
 # glm_lkm_cv <- cv.glmnet(x = lkm_x_sis, y = lkm_y,
 #                         family = "binomial", alpha = 0)
