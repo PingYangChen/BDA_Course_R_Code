@@ -159,8 +159,10 @@ credit_pc_data <- data.frame(
 )
 summary(lm(Balance ~ ., data = credit_pc_data))
 #
-
-
+fit_pcr <- lm(Balance ~ ., data = credit_pc_data)
+y_pcr_fit <- predict(fit_pcr, credit_pc_data)
+mse_pcr <- mean((y - y_pcr_fit)^2)
+print(mse_pcr)
 
 # Partial Least Squares
 library(pls)
