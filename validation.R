@@ -270,15 +270,86 @@ print(mse_cv)
 default_data <- read.csv(text = RCurl::getURL(
   "https://raw.githubusercontent.com/PingYangChen/BDA_Course_R_Code/main/James_2023_CSV/Default.csv"
 ))
-names(default_data)
-head(default_data, 5)
+print(names(default_data))
+print(dim(default_data))
 
 default_data$default <- as.factor(default_data$default)
 default_data$student <- as.factor(default_data$student)
 
 
 
+confusion <- function(true_y, pred_y) {
+  unique_y <- unique(true_y)
+  ncateg <- length(unique_y)
+  confmat <- matrix(0, ncateg, ncateg)
+  for (i in 1:ncateg) {
+    loc <- which(true_y == unique_y[i])
+    pred_count <- table(c(pred_y[loc], unique_y)) - 1
+    confmat[i,] <- pred_count
+  }
+  dimnames(confmat) <- list(unique_y, unique_y)
+  return(confmat)
+}
 
+# For convenience, our practicing examples today are all based on glmnet 
+# Create model matrix and response vector
+modelmat <- model.matrix(default ~ ., data = default_data)[,-1]
+y <- as.numeric(default_data$default) - 1
+# fit logistic regression model
+lm_fit <- glmnet(modelmat, y, family = "binomial", alpha = 0, lambda = 0)
+y_fit <- (predict(lm_fit, modelmat, type = "response") > 0.5)
+# Compute Accuracy using confusion matrix
+confmat <- confusion(y, y_fit)
+print(confmat)
+acc <- 100*sum(diag(confmat))/sum(confmat)
+print(acc)
+
+
+# Implement 10-fold CV
+n <- length(y)
+nfold <- 10 # set number of folds
+# Make folds by yourself
+library(pracma)
+# Always remember to set seed before actions with randomness involved!!
+seed <- 1
+print(seed)
+set.seed(seed)
+# Create belonging folds for each data point
+folds <- pracma::randperm( # randomly permute the index of folds
+  rep(1:nfold, time = ceiling(n/nfold))[1:n]
+)
+# Create space for storing predicted values of 10-fold CV 
+y_cv <- numeric(n)
+# Start 10-fold CV
+for (k in 1:nfold) {
+  # Get data id for training and testing
+  train_id <- which(folds != k)
+  test_id <- which(folds == k)
+  # Get training data (X and y)
+  train_x <- modelmat[train_id,]
+  train_y <- y[train_id]
+  # Get testing data (X)
+  test_x <- modelmat[test_id,]
+  test_y <- y[test_id]
+  # Fit OLS model with training data
+  lm_fold <- glmnet(train_x, train_y, family = "binomial", alpha = 0, lambda = 0)
+  # Get prediction of the testing data
+  yhat_fold <- (predict(lm_fold, test_x, type = "response") > 0.5)
+  # Allocate those predicted values into the corresponding fold
+  y_cv[test_id] <- yhat_fold
+}
+# Compute Accuracy
+confmat_cv <- confusion(y, y_cv)
+print(confmat_cv)
+acc_cv <- 100*sum(diag(confmat_cv))/sum(confmat_cv)
+print(acc_cv)
+
+
+tpr <- 100*confmat[2,2]/sum(confmat[2,])
+tpr_cv <- 100*confmat_cv[2,2]/sum(confmat_cv[2,])
+
+
+plot(default_data$default, ylab = "Count", xlab = "default")
 
 
 
