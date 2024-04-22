@@ -16,10 +16,7 @@ baseball_data$League <- as.factor(baseball_data$League)
 baseball_data$Division <- as.factor(baseball_data$Division)
 baseball_data$NewLeague <- as.factor(baseball_data$NewLeague)
 
-
-
-
-ggpairs(baseball_data[,-ncol(baseball_data)], aes(colour = "firebrick", alpha = 0.4)) 
+#ggpairs(baseball_data[,-ncol(baseball_data)], aes(colour = "firebrick", alpha = 0.4)) 
 
 library(pracma)
 library(rpart)
@@ -116,7 +113,7 @@ heart_data$AHD <- as.factor(heart_data$AHD)
 
 
 
-ggpairs(heart_data, aes(colour = "firebrick", alpha = 0.4)) 
+#ggpairs(heart_data, aes(colour = "firebrick", alpha = 0.4)) 
 
 
 
@@ -198,6 +195,26 @@ cla_xgb <- xgboost(data = model_mat, label = heart_data_encoded$AHD,
 
 library(lightgbm)
 
+library(randomForest)
+# Fit random forest model
+cla_rf <- randomForest(AHD ~ ., data = heart_data, ntree = 100)
+
+library(DALEX)
+
+exp_rf <- explain(cla_rf, data = heart_data[,-ncol(heart_data)], y = as.numeric(heart_data$AHD) - 1)
+
+shap_1 <- predict_parts(explainer = exp_rf, 
+                        new_observation = heart_data[1,], 
+                        type = "shap",
+                        B = 25)
+plot(shap_1)
 
 
+
+
+shap_2 <- predict_parts(explainer = exp_rf, 
+                        new_observation = heart_data[2,], 
+                        type = "shap",
+                        B = 25)
+plot(shap_2)
 
