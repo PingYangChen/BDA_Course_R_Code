@@ -1,6 +1,10 @@
 ---
 title: "Practice: Association Rule"
-output: html_document
+output:
+  prettydoc::html_pretty:
+    theme: architect 
+    highlight: github
+    math: katex
 #date: "2025-03-11"
 ---
 
@@ -8,3 +12,90 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+```{r load_pkg, eval=TRUE, echo=TRUE, message=FALSE, warning=FALSE}
+library(arules)
+library(arulesViz)
+```
+
+```{r read_lotto, eval=TRUE, echo=TRUE}
+url <- 'https://raw.githubusercontent.com/PingYangChen/BDA_Course_R_Code/refs/heads/main/sample_data/lotto_2023-202503037.csv'
+df <- read.csv(url)
+names(df)
+head(df, 6)
+```
+
+定義購物車資料
+
+- 期別：transaction ID
+- 獎號：items
+
+**arules** 需要的格式如下
+```{r observe_data, eval=TRUE, echo=TRUE}
+data.frame(tid = rep("112000001", 6), item = c(2, 4, 8, 19, 24, 39))
+```
+
+觀察原始資料的第一筆獎號 `r df$獎號[1]`，此原為字串，前後有中括號，數字已逗號分隔。
+需要從字串移除中括號，並分離出六個整數
+
+
+- 移除中括號：使用字串處理函數 `strspilt`，依次將左中括號 `\\[`、右中括號 `\\]` 分離。
+
+```{r observe_data0, eval=TRUE, echo=TRUE}
+tmp0 <- strsplit(df$獎號[1], "\\[")
+print(tmp0)
+```
+```{r observe_data1, eval=TRUE, echo=TRUE}
+tmp1 <- strsplit(tmp0[[1]][2], "\\]")
+print(tmp1)
+```
+- 拆解逗號分離：使用字串處理函數 `strspilt`，以逗號 `,` 作為切分點切割字串。
+
+```{r observe_data2, eval=TRUE, echo=TRUE}
+tmp2 <- strsplit(tmp1[[1]][1], ",")
+print(tmp2)
+```
+
+- 整數化：使用函數 `as.integer`，以逗號 `,` 將六個整數字串串列轉為整數串列。
+
+```{r observe_data3, eval=TRUE, echo=TRUE}
+as.integer(tmp2[[1]])
+```
+
+將以上步驟整合成為可調用的函數
+```{r define_splitnum_func, eval=TRUE, echo=TRUE}
+SplitNumbers <- function(num_list) {
+  tmp0 <- strsplit(num_list, "\\[")
+  tmp1 <- strsplit(tmp0[[1]][2], "\\]")
+  tmp2 <- strsplit(tmp1[[1]][1], ",")
+  out <- as.integer(tmp2[[1]])
+  return(out)
+}
+```
+
+建立購物車資料
+```{r define_trans_df, eval=TRUE, echo=TRUE}
+item_vec <- tid_vec <- c()
+for (i in 1:nrow(df)) {
+  itmp <- SplitNumbers(df$獎號[i])
+  item_vec <- c(item_vec, itmp)
+  tid_vec <- c(tid_vec, rep(df$期別[i], length(itmp)))
+}
+df_trans <- data.frame(tid = tid_vec, item = item_vec)
+```
+
+
+```{r define_arules_df, eval=TRUE, echo=TRUE}
+df_arules <- as(split(df_trans$item, df_trans$tid), "transactions")
+inspect(head(df_arules, n = 6))
+```
+
+```{r make_rules, eval=TRUE, echo=TRUE}
+rules <- apriori(df_arules, 
+                 parameter = list(
+                   support = 0.01,   # minimal support of an item set
+                   confidence = 0.5, # minimal confidence of rules/association hyperedges
+                   minlen = 1 # minimal number of items per item set
+                 ))
+# Display the top 3 support rules
+inspect(head(rules, n = 5, by = "support"))
+```
