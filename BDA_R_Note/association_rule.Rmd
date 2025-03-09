@@ -1,0 +1,10 @@
+---
+title: "Practice: Association Rule"
+output: html_document
+#date: "2025-03-11"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
