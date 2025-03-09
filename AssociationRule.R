@@ -49,8 +49,8 @@ plot(rules, method = "matrix", limit = 6)
 
 
 
-
-df <- read.csv('sample_data/lotto_2023-202503037.csv')
+df <- read.csv('https://raw.githubusercontent.com/PingYangChen/BDA_Course_R_Code/refs/heads/main/sample_data/lotto_2023-202503037.csv')
+#read.csv('sample_data/lotto_2023-202503037.csv')
 names(df)
 
 SplitNumbers <- function(num_list) {
