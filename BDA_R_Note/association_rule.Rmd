@@ -2,7 +2,7 @@
 title: "Practice: Association Rule"
 output:
   prettydoc::html_pretty:
-    theme: architect 
+    theme: tactile 
     highlight: github
     math: katex
 #date: "2025-03-11"
@@ -12,31 +12,40 @@ output:
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+# 大樂透獎號關聯式分析
+
+
 ```{r load_pkg, eval=TRUE, echo=TRUE, message=FALSE, warning=FALSE}
 library(arules)
 library(arulesViz)
 ```
 
+資料為透過專用 python 爬蟲套件 https://github.com/stu01509/TaiwanLotteryCrawler 爬取 2023 年 01 月 01 日起至 2025 年 03 月 07 日的大樂透開獎獎號，爬下資料儲存於 https://github.com/PingYangChen/BDA_Course_R_Code/blob/main/sample_data/lotto_2023-202503037.csv。
+
+![](fig/lotto_screenshot.png){fig.align='center'}
+
+## 讀取資料並整理成關聯式分析所需格式
 ```{r read_lotto, eval=TRUE, echo=TRUE}
+# Read data from the github link
 url <- 'https://raw.githubusercontent.com/PingYangChen/BDA_Course_R_Code/refs/heads/main/sample_data/lotto_2023-202503037.csv'
 df <- read.csv(url)
-names(df)
+# Display a few rows of the dataframe 
 head(df, 6)
 ```
 
-定義購物車資料
+從 **arules** 的範例對照，在此的購物車資料定義應為
 
-- 期別：transaction ID
-- 獎號：items
+- 期別：transaction ID (tid)
+- 獎號：item
 
-**arules** 需要的格式如下
+且 **arules** 需要的 `dataframe` 格式如下
 ```{r observe_data, eval=TRUE, echo=TRUE}
 data.frame(tid = rep("112000001", 6), item = c(2, 4, 8, 19, 24, 39))
 ```
+每期為一個單位的購物車（transaction ID），每期開出六個號碼（items），則每期資料應在 `dataframe` 中佔 6 列。
 
 觀察原始資料的第一筆獎號 `r df$獎號[1]`，此原為字串，前後有中括號，數字已逗號分隔。
-需要從字串移除中括號，並分離出六個整數
-
+需要從字串移除中括號，並分離出六個整數。
 
 - 移除中括號：使用字串處理函數 `strspilt`，依次將左中括號 `\\[`、右中括號 `\\]` 分離。
 
@@ -72,7 +81,7 @@ SplitNumbers <- function(num_list) {
 }
 ```
 
-建立購物車資料
+建立購物車資料，滿足 **arules** 需要的 `dataframe` 
 ```{r define_trans_df, eval=TRUE, echo=TRUE}
 item_vec <- tid_vec <- c()
 for (i in 1:nrow(df)) {
@@ -83,12 +92,12 @@ for (i in 1:nrow(df)) {
 df_trans <- data.frame(tid = tid_vec, item = item_vec)
 ```
 
-
+最後將此 `dataframe` 改為 `"transactions"` 格式，即完成資料前處理。
 ```{r define_arules_df, eval=TRUE, echo=TRUE}
 df_arules <- as(split(df_trans$item, df_trans$tid), "transactions")
 inspect(head(df_arules, n = 6))
 ```
-
+## 建立關聯式規則
 ```{r make_rules, eval=TRUE, echo=TRUE}
 rules <- apriori(df_arules, 
                  parameter = list(
@@ -96,6 +105,17 @@ rules <- apriori(df_arules,
                    confidence = 0.5, # minimal confidence of rules/association hyperedges
                    minlen = 1 # minimal number of items per item set
                  ))
+```
+
+
+```{r insp_rules_hide, eval=TRUE, echo=FALSE}
 # Display the top 3 support rules
-inspect(head(rules, n = 5, by = "support"))
+out_hide <- inspect(head(rules, n = 5, by = "support"))
+```
+
+`r out_hide[1]`
+
+```{r insp_rules, eval=TRUE, echo=TRUE}
+# Display the top 3 support rules
+inspect(head(rules, n = 10, by = "support"))
 ```
