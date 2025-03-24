@@ -1,0 +1,42 @@
+---
+title: "Linear Models: Basic Concept"
+output:
+  prettydoc::html_pretty:
+    theme: tactile 
+    highlight: github
+    math: katex
+    toc: true
+    self-contained: true
+#date: "2025-03-11"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+# 廣告資料
+
+```{r adv_data}
+advUrl <- 'https://raw.githubusercontent.com/PingYangChen/DS-pytutorial/refs/heads/main/sample_data/Advertising.csv'
+advDf <- read.csv(advUrl)
+
+```
+
+```{r}
+library(GGally)
+ggpairs(adv_data[,-1], aes(colour = "firebrick", alpha = 0.4)) 
+```
+
+
+```{r}
+par(mfrow = c(1, 3), mar = c(5, 4.5, 1, 1))
+for (i in 2:4) {
+  plot(adv_data[,i],adv_data[,5], ylab = "Sales", xlab = names(adv_data)[i],
+       pch = 20, cex.lab = 1.5, cex.axis = 1.2, col = "firebrick")
+  mdl <- lm(adv_data[,5] ~ adv_data[,i])
+  abline(a = mdl$coefficients[1], b = mdl$coefficients[2], 
+         col = '#0000FF', lwd = 3)
+}
+par(mfrow = c(1, 1))
+```

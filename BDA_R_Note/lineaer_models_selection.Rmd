@@ -1,0 +1,330 @@
+---
+title: "Linear Model: Model Selection"
+output:
+  prettydoc::html_pretty:
+    theme: tactile 
+    highlight: github
+    math: katex
+    toc: true
+    self-contained: true
+#date: "2025-03-11"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Model Selection for Linear Models
+
+首先，以信用卡資料作為範例，讀取資料並整理成迴歸分析所需格式
+```{r creDfRead, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
+creUrl <- 'https://raw.githubusercontent.com/PingYangChen/BDA_Course_R_Code/refs/heads/main/sample_data/Credit.csv'
+creDf <- read.csv(creUrl)
+```
+
+預覽欄位與少數前幾筆資料，檢視個欄位的資料型態。
+```{r creDfPrev, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
+names(creDf)
+head(creDf, 4)
+```
+
+針對類別型變數，在 R 中請自行將欄位更改為 `factor` 型態。
+```{r creDfSetProp, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
+creDf$Own <- as.factor(creDf$Own)
+creDf$Student <- as.factor(creDf$Student)
+creDf$Married <- as.factor(creDf$Married)
+creDf$Region <- as.factor(creDf$Region)
+```
+
+之後可做些視覺化觀察資料，例如對兩兩變數作圖。
+```{r creDfPlot, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE, fig.align='center'}
+library(ggplot2)
+library(GGally)
+ggpairs(creDf, aes(colour = "firebrick", alpha = 0.4)) 
+```
+
+## Stepwise Regression
+
+逐步迴歸的執行方式：
+
+1. 指定最小(無自變數)及最大(含所有自變數)模型
+
+```{r creDfStepwisePrep, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
+lm_null <- lm(Balance ~ 1, data = creDf)
+lm_full <- lm(Balance ~ ., data = creDf)
+```
+
+2. 指定 Information Criterion 的參數
+$$IC = -2\log{(Likelihood)} + k\times p$$
+  - AIC：$k=2$
+  - BIC：$k=\log{(n)}$
+
+```{r creDfStepwiseCriVal, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
+# use AIC
+aic_param <- 2
+# use BIC
+bic_param <- log(nrow(creDf)) # log(n)
+```
+
+3. 使用內建 `step` 函數執行 Stepwise Regression，以下以 BIC 選模為例
+
+```{r creDfStepwise, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE, progress=FALSE, results='hide'}
+# forward method
+mf <- step(lm_null, scope = list(lower = lm_null, upper = lm_full), 
+           direction = "forward", k = bic_param)
+# backward method
+mb <- step(lm_full, scope = list(lower = lm_null, upper = lm_full), 
+           direction = "backward", k = bic_param)
+# both-way method
+m2 <- step(lm_null, scope = list(lower = lm_null, upper = lm_full), 
+           direction = "both", k = bic_param)
+```
+
+4. 檢視選模結果
+
+```{r creDfStepwiseRes, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
+# summary(mf) # forward method
+# summary(mb) # backward method
+summary(m2) # both-way method
+```
+
+## Regularization Methods
+
+### Ridge, Lasso and Elastic Net
+
+
+`glmnet` 套件為 R 語言裡常用的 Regularization Method 套件
+
+```{r loadglmnet, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
+library(glmnet)
+```
+
+文件連結[點此](https://cran.r-project.org/web/packages/glmnet/index.html)
+
+同樣以信用卡資料作為範例，先將資料整理成 `glmnet` 所需格式：`model.matrix`。
+
+`glmnet` 未延續 R 語言的模型語法（如　`lm` 或 `glm` 使用之 `Y ~ x`），反而分別輸入反應變數（向量）及解釋變數（矩陣）。
+
+- 反應變數可直接從資料中擷取。
+- 解釋變數則透過 `model.matrix` 函數與 R 模型語法快速整理**（重點：記得刪除截距項）**。
+
+```{r creDfModelMat, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
+# Create Response Variable
+y <- creDf$Balance
+# Create model matrix
+modelmat <- model.matrix(Balance ~ ., data = creDf)[,-1] # Remove intercept part
+colnames(modelmat)
+head(modelmat, 4)
+```
+
+- `lambda`: the values of `lambda` used in the fits.
+- `cvm`: The mean cross-validated error - a vector of length `length(lambda)`.
+
+- `lambda.min`: value of `lambda` that gives minimum `cvm`.
+- `lambda.1se`: largest value of `lambda` such that error is within 1 standard error of the minimum.
+
+```{r setseed, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE}
+set.seed(2025)
+```
+
+```{r creFitRidge, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
+# Fit Ridge and tune lambda via CV
+rid_cv <- cv.glmnet(modelmat, y, family = "gaussian", alpha = 0,
+                    standardize = TRUE, intercept = TRUE, 
+                    lambda = exp(seq(-5, 1, length = 100)))
+# Visualize the tuning results
+plot(rid_cv$lambda, rid_cv$cvm, type = "l", 
+     xlab = "lambda", ylab = "cvm", main = "Ridge Reg.")
+# Refit Ridge with proper lambda
+m_rid <- glmnet(modelmat, y, family = "gaussian", alpha = 0,
+                standardize = TRUE, intercept = TRUE,
+                lambda = rid_cv$lambda.1se)
+```
+```{r creFitLasso, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
+# Fit Lasso and tune lambda via CV
+las_cv <- cv.glmnet(modelmat, y, family = "gaussian", alpha = 1,
+                    standardize = TRUE, intercept = TRUE)
+# Refit Lasso with proper lambda
+m_las <- glmnet(modelmat, y, family = "gaussian", alpha = 1,
+                standardize = TRUE, intercept = TRUE,
+                lambda = las_cv$lambda.1se)
+```
+```{r creFitEN, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
+# Fit Elastic net and tune lambda via CV
+en_cv <- cv.glmnet(modelmat, y, family = "gaussian", alpha = 0.3,
+                   standardize = TRUE, intercept = TRUE)
+# Refit Elastic net with proper lambda
+m_en <- glmnet(modelmat, y, family = "gaussian", alpha = 0.3,
+               standardize = TRUE, intercept = TRUE,
+               lambda = en_cv$lambda.1se)
+```
+
+```{r glmnetCompare, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
+regMethodResult <- cbind(
+  rbind("(Intercept)" = m_rid$a0, m_rid$beta),
+  rbind("(Intercept)" = m_las$a0, m_las$beta),
+  rbind("(Intercept)" = m_en$a0, m_en$beta)
+)
+colnames(regMethodResult) <- c("ridge", "Lasso", "ElasN")
+regMethodResult
+```
+
+### Group Lasso & Sparse Group Lasso
+
+Regularization Method 
+
+```{r loadgglasso, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
+library(gglasso)
+```
+
+```{r creFitGL, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
+names(creDf)
+modelmat2fi <- model.matrix(
+  Balance ~ . + Income * (Age + Education + Own + Student), data = creDf
+)[,-1]
+colnames(modelmat2fi)
+twofi_group <- c(1, 2, 3, 4, 1, 
+                 1, 1, 1, 5, 6, 
+                 6, 1, 1, 1, 1)
+names(twofi_group) <- colnames(modelmat2fi)
+twofi_group
+# Group Lasso: choose best lambda
+glas_cv <- cv.gglasso(modelmat2fi, y, group = twofi_group, loss = "ls")
+glas_cv$lambda.min
+glas_cv$lambda.1se
+m_glas <- gglasso(modelmat2fi, y, group = twofi_group, loss = "ls",
+                  lambda = glas_cv$lambda.1se)
+m_glas$b0
+m_glas$beta
+```
+
+```{r loadSGL, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
+library(sparsegl)
+```
+
+```{r creFitSGL, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
+# Sparse group lasso  application to modeling 2fi
+# Sparse Group Lasso: choose best lambda using CV
+#
+sglas_cv <- cv.sparsegl(modelmat2fi, y, group = twofi_group, family = "gaussian",
+                        asparse = 0.05) # set weight of L1-penalty as 0.05
+sglas_cv$lambda.min
+sglas_cv$lambda.1se
+m_sglas <- sparsegl(modelmat2fi, y, group = twofi_group, family = "gaussian",
+                    lambda = sglas_cv$lambda.1se, asparse = 0.05)
+m_sglas$b0
+m_sglas$beta
+```
+
+## Sure Independence Screening for Ultrahigh Dimensional Data
+
+```{r loadSIS, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
+library(SIS)
+```
+```{r leukemiaFitSIS, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
+# Sure independence screening
+data(leukemia.train)
+# response vatiable: V7130
+dim(leukemia.train)
+# [1]   38 7130
+# WRONG: use glm to fit the ultrahigh dimensional leukemia data
+glm_lkm <- glm(V7130 ~ ., data = leukemia.train,
+               family = binomial(link = "logit"))
+# summary(glm_lkm)
+dim(summary(glm_lkm)$coefficients)
+# [1] 38  4
+head(summary(glm_lkm)$coefficients, 6)
+# SIS method
+lkm_x <- model.matrix(V7130 ~ ., data = leukemia.train)[,-1]
+lkm_y <- leukemia.train[,7130]
+sis_lkm <- SIS(lkm_x, lkm_y, family = "binomial", penalty = "lasso",
+               tune = "bic", seed = 1) #, varISIS = "vanilla"
+# SIS selected
+colnames(lkm_x)[sis_lkm$ix]
+# [1] "V3320" "V3810"
+lkm_x_sis <- lkm_x[,sis_lkm$ix]
+
+ggpairs(data.frame(cbind(lkm_x_sis, y = lkm_y)),
+        aes(colour = as.factor(lkm_y), alpha = 0.4))
+
+glm_lkm_s <- glmnet(x = lkm_x_sis, y = lkm_y,
+                    family = "binomial", alpha = 0, lambda = 0)
+glm_lkm_s$a0
+glm_lkm_s$beta
+
+leukemia_sis <- data.frame(cbind(lkm_x_sis, y = lkm_y))
+summary(glm(y ~ ., data = leukemia_sis, family = binomial(link = "logit")))
+```
+
+
+
+# Homework: Lasso Tool Comparison
+
+- 比較 R 的 glmnet 與 python 的 Lasso 建模之差異
+
+作業內容：
+
+1. 使用課堂的信用卡資料。
+
+```{r, echo=TRUE, eval=FALSE, message=FALSE, warning=FALSE}
+'https://raw.githubusercontent.com/PingYangChen/BDA_Course_R_Code/refs/heads/main/sample_data/Credit.csv'
+```
+
+2. 使用 R **glmnet** 套件建立 Lasso 迴歸。
+3. 使用 python **scikit-learn** 套件建立 Lasso 迴歸。
+4. 比較與說明 R **glmnet** 以及 python **scikit-learn** 的模型參數估計結果。
+5. 自行找一份資料維度較大的資料，試作步驟 2. - 4.，比較兩種功能相同工具的模型參數估計結果。
+6. 比較與說明 R **glmnet** 以及 python **scikit-learn** 在使用上的差異，含前置作業、執行步驟等。
+
+
+### 信用卡資料 Lasso 範例 Python Code 
+
+- Python 環境設定[參考連結](https://html-preview.github.io/?url=https://github.com/PingYangChen/DS-pytutorial/blob/main/lecture_note/python_basic.html)
+- **scikit-learn**[文件連結](https://scikit-learn.org/stable/modules/generated/sklearn.linear_model.LassoCV.html#sklearn.linear_model.LassoCV)
+
+
+```{python, echo=TRUE, eval=FALSE, message=FALSE, warning=FALSE}
+import pandas as pd
+import numpy as np
+from sklearn.preprocessing import StandardScaler  # 用於進行資料標準化
+from sklearn.linear_model import LassoCV  # 用於進行 Lasso 回歸的交叉驗證
+```
+
+讀取信用卡資料集，並對其進行資料的預處理，將目標變數設定為 `Balance`（信用卡餘額），並轉換所有的分類變數為虛擬變數，以便在後續的模型分析中使用。
+```{python, echo=TRUE, eval=FALSE, message=FALSE, warning=FALSE}
+# 從網路讀取信用卡資料集並載入為 pandas DataFrame
+creDf = pd.read_csv('https://raw.githubusercontent.com/PingYangChen/DS-pytutorial/refs/heads/main/sample_data/Credit.csv')
+# 將 'Own', 'Student', 'Married' 和 'Region' 這些分類變數轉換為虛擬變數，並刪除第一個類別以避免多重共線性
+creDfDummy = pd.get_dummies(creDf, columns=['Own', 'Student', 'Married', 'Region'], drop_first=True, dtype=int)
+# 設定目標變數 y 為 'Balance'（信用卡餘額）
+y = creDfDummy['Balance']
+# 設定自變數 x ，為所有欄位（不包含 'Balance' 欄位）
+x = creDfDummy[np.setdiff1d(creDfDummy.columns, 'Balance').tolist()]
+print(x.columns)
+```
+
+首先對資料進行標準化，這是正規化迴歸的一個前處理步驟。
+```{python, echo=TRUE, eval=FALSE, message=FALSE, warning=FALSE}
+# 對自變數進行標準化，使每個變數的平均值為 0，標準差為 1
+scaler = StandardScaler()
+scaler.fit(x)
+x_standard = scaler.transform(x)
+```
+
+```{python, echo=TRUE, eval=FALSE, message=FALSE, warning=FALSE}
+# 設定一組 alpha 值，用於進行交叉驗證
+alpha_vec = 2**np.linspace(-5, 5, 100)
+```
+
+使用 `Lasso` 回歸進行交叉驗證，選擇最佳的懲罰參數 `alpha`，並顯示變數的迴歸係數。
+```{python, echo=TRUE, eval=FALSE, message=FALSE, warning=FALSE}
+# 使用 Lasso 回歸進行交叉驗證，選擇最合適的 alpha 值
+lasso = LassoCV(alphas=alpha_vec, fit_intercept=True, cv=5)
+lasso.fit(x_standard, y)
+lasso.intercept_ # 模型的截距項
+# 將 Lasso 模型的迴歸係數轉換為 pandas DataFrame 格式並顯示
+lasso_coef = pd.DataFrame({'var': x.columns, 'coef': lasso.coef_})
+print(lasso_coef)
+```
+
+

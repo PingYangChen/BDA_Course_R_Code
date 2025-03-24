@@ -5,6 +5,8 @@ output:
     theme: tactile 
     highlight: github
     math: katex
+    toc: true
+    self-contained: true
 #date: "2025-03-11"
 ---
 
