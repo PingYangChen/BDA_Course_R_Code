@@ -144,6 +144,12 @@ m_rid <- glmnet(modelmat, y, family = "gaussian", alpha = 0,
 # Fit Lasso and tune lambda via CV
 las_cv <- cv.glmnet(modelmat, y, family = "gaussian", alpha = 1,
                     standardize = TRUE, intercept = TRUE)
+# Visualize the tuning results
+nl <- 71
+plot(las_cv$lambda[1:nl], las_cv$cvm[1:nl], type = "l", 
+     xlab = "lambda", ylab = "cvm", main = "Lasso Reg.")
+points(las_cv$lambda[1:nl], las_cv$cvup[1:nl], type = "l", lty = 2)
+points(las_cv$lambda[1:nl], las_cv$cvlo[1:nl], type = "l", lty = 2)
 # Refit Lasso with proper lambda
 m_las <- glmnet(modelmat, y, family = "gaussian", alpha = 1,
                 standardize = TRUE, intercept = TRUE,
@@ -153,6 +159,9 @@ m_las <- glmnet(modelmat, y, family = "gaussian", alpha = 1,
 # Fit Elastic net and tune lambda via CV
 en_cv <- cv.glmnet(modelmat, y, family = "gaussian", alpha = 0.3,
                    standardize = TRUE, intercept = TRUE)
+# Visualize the tuning results
+plot(en_cv$lambda, en_cv$cvm, type = "l", 
+     xlab = "lambda", ylab = "cvm", main = "Elastic Net Reg.")
 # Refit Elastic net with proper lambda
 m_en <- glmnet(modelmat, y, family = "gaussian", alpha = 0.3,
                standardize = TRUE, intercept = TRUE,
