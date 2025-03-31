@@ -187,6 +187,7 @@ Lasso</a></li>
 </ul></li>
 <li><a href="#sure-independence-screening-for-ultrahigh-dimensional-data" id="toc-sure-independence-screening-for-ultrahigh-dimensional-data">Sure
 Independence Screening for Ultrahigh Dimensional Data</a></li>
+<li><a href="#參考文獻" id="toc-參考文獻">參考文獻</a></li>
 </ul></li>
 <li><a href="#homework-lasso-tool-comparison" id="toc-homework-lasso-tool-comparison">Homework: Lasso Tool
 Comparison</a>
@@ -321,16 +322,45 @@ Code</a></li>
 ## 2           0          1
 ## 3           0          1
 ## 4           0          1</code></pre>
+<p><code>glmnet</code> 及 <code>cv.glmnet</code> 函數使用方法</p>
 <ul>
-<li><p><code>lambda</code>: the values of <code>lambda</code> used in
-the fits.</p></li>
-<li><p><code>cvm</code>: The mean cross-validated error - a vector of
-length <code>length(lambda)</code>.</p></li>
-<li><p><code>lambda.min</code>: value of <code>lambda</code> that gives
-minimum <code>cvm</code>.</p></li>
-<li><p><code>lambda.1se</code>: largest value of <code>lambda</code>
-such that error is within 1 standard error of the minimum.</p></li>
+<li><code>alpha</code>: 控制 L1-penalty、L2-penalty
+的分配比例，數值範圍為 [0, 1]。
+<ul>
+<li><code>alpha = 0</code>，為 Ridge regression。</li>
+<li><code>alpha = 1</code>，為 Lasso regression。</li>
+<li><code>alpha</code> 介於 (0, 1) 之間，為 Elastic net
+regression，<code>alpha</code> 越大，L1-penalty 越重。</li>
+</ul></li>
+<li><code>lambda</code>: 控制 L1-penalty、L2-penalty
+的逞罰程度，<code>lambda</code> 越大，逞罰程度越重。
+<ul>
+<li>一般而言，<code>lambda</code> 值可為一個由很小的值指數成長到一個大於
+1 的值，例如 <code>exp(seq(-5, 1, length = 100))</code>。</li>
+</ul></li>
+<li><code>standardize</code>: 是否對 <code>x</code>
+進行標準化，基於解釋變數之間可能數值範圍、單位不同，預設為
+<code>TRUE</code>。</li>
+<li><code>intercept</code>: 是否配適截距項，預設為
+<code>TRUE</code>。</li>
 </ul>
+<p>給定一組 <code>lambda</code> 向量，可透過 <code>cv.glmnet</code>
+函數進行交叉驗證選擇合適的 <code>lambda</code> 值，其關鍵輸出如下</p>
+<ul>
+<li><code>lambda</code>: 使用者所輸入的 L1-penalty、L2-penalty
+的逞罰程度向量。</li>
+<li><code>cvm</code>: 交叉驗證的平均誤差，長度為
+<code>length(lambda)</code>，分別對應每個 <code>lambda</code>
+的驗證結果。</li>
+<li><code>lambda.min</code>: 使 <code>cvm</code> 最小的
+<code>lambda</code> 值，通常數值較小，逞罰效果較弱。</li>
+<li><code>lambda.1se</code>: 交互驗證誤差距離最小 <code>cvm</code>
+一單位標準差內的最大 <code>lambda</code> 值，可增加逞罰效果。</li>
+</ul>
+<p>以 <code>cv.glmnet</code> 函數選擇合適的 <code>lambda</code>
+值後，將挑選的 <code>lambda</code> 輸入 <code>glmnet</code>
+建立最終模型。</p>
+<p>以下為信用卡資料分析的示範程式</p>
 <div class="sourceCode" id="cb18"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb18-1"><a href="#cb18-1" tabindex="-1"></a><span class="co"># Fit Ridge and tune lambda via CV</span></span>
 <span id="cb18-2"><a href="#cb18-2" tabindex="-1"></a>rid_cv <span class="ot">&lt;-</span> <span class="fu">cv.glmnet</span>(modelmat, y, <span class="at">family =</span> <span class="st">&quot;gaussian&quot;</span>, <span class="at">alpha =</span> <span class="dv">0</span>,</span>
 <span id="cb18-3"><a href="#cb18-3" tabindex="-1"></a>                    <span class="at">standardize =</span> <span class="cn">TRUE</span>, <span class="at">intercept =</span> <span class="cn">TRUE</span>, </span>
@@ -346,24 +376,37 @@ such that error is within 1 standard error of the minimum.</p></li>
 <div class="sourceCode" id="cb20"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb20-1"><a href="#cb20-1" tabindex="-1"></a><span class="co"># Fit Lasso and tune lambda via CV</span></span>
 <span id="cb20-2"><a href="#cb20-2" tabindex="-1"></a>las_cv <span class="ot">&lt;-</span> <span class="fu">cv.glmnet</span>(modelmat, y, <span class="at">family =</span> <span class="st">&quot;gaussian&quot;</span>, <span class="at">alpha =</span> <span class="dv">1</span>,</span>
 <span id="cb20-3"><a href="#cb20-3" tabindex="-1"></a>                    <span class="at">standardize =</span> <span class="cn">TRUE</span>, <span class="at">intercept =</span> <span class="cn">TRUE</span>)</span>
-<span id="cb20-4"><a href="#cb20-4" tabindex="-1"></a><span class="co"># Refit Lasso with proper lambda</span></span>
-<span id="cb20-5"><a href="#cb20-5" tabindex="-1"></a>m_las <span class="ot">&lt;-</span> <span class="fu">glmnet</span>(modelmat, y, <span class="at">family =</span> <span class="st">&quot;gaussian&quot;</span>, <span class="at">alpha =</span> <span class="dv">1</span>,</span>
-<span id="cb20-6"><a href="#cb20-6" tabindex="-1"></a>                <span class="at">standardize =</span> <span class="cn">TRUE</span>, <span class="at">intercept =</span> <span class="cn">TRUE</span>,</span>
-<span id="cb20-7"><a href="#cb20-7" tabindex="-1"></a>                <span class="at">lambda =</span> las_cv<span class="sc">$</span>lambda<span class="fl">.1</span>se)</span></code></pre></div>
-<div class="sourceCode" id="cb21"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb21-1"><a href="#cb21-1" tabindex="-1"></a><span class="co"># Fit Elastic net and tune lambda via CV</span></span>
-<span id="cb21-2"><a href="#cb21-2" tabindex="-1"></a>en_cv <span class="ot">&lt;-</span> <span class="fu">cv.glmnet</span>(modelmat, y, <span class="at">family =</span> <span class="st">&quot;gaussian&quot;</span>, <span class="at">alpha =</span> <span class="fl">0.3</span>,</span>
-<span id="cb21-3"><a href="#cb21-3" tabindex="-1"></a>                   <span class="at">standardize =</span> <span class="cn">TRUE</span>, <span class="at">intercept =</span> <span class="cn">TRUE</span>)</span>
-<span id="cb21-4"><a href="#cb21-4" tabindex="-1"></a><span class="co"># Refit Elastic net with proper lambda</span></span>
-<span id="cb21-5"><a href="#cb21-5" tabindex="-1"></a>m_en <span class="ot">&lt;-</span> <span class="fu">glmnet</span>(modelmat, y, <span class="at">family =</span> <span class="st">&quot;gaussian&quot;</span>, <span class="at">alpha =</span> <span class="fl">0.3</span>,</span>
-<span id="cb21-6"><a href="#cb21-6" tabindex="-1"></a>               <span class="at">standardize =</span> <span class="cn">TRUE</span>, <span class="at">intercept =</span> <span class="cn">TRUE</span>,</span>
-<span id="cb21-7"><a href="#cb21-7" tabindex="-1"></a>               <span class="at">lambda =</span> en_cv<span class="sc">$</span>lambda<span class="fl">.1</span>se)</span></code></pre></div>
-<div class="sourceCode" id="cb22"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb22-1"><a href="#cb22-1" tabindex="-1"></a>regMethodResult <span class="ot">&lt;-</span> <span class="fu">cbind</span>(</span>
-<span id="cb22-2"><a href="#cb22-2" tabindex="-1"></a>  <span class="fu">rbind</span>(<span class="st">&quot;(Intercept)&quot;</span> <span class="ot">=</span> m_rid<span class="sc">$</span>a0, m_rid<span class="sc">$</span>beta),</span>
-<span id="cb22-3"><a href="#cb22-3" tabindex="-1"></a>  <span class="fu">rbind</span>(<span class="st">&quot;(Intercept)&quot;</span> <span class="ot">=</span> m_las<span class="sc">$</span>a0, m_las<span class="sc">$</span>beta),</span>
-<span id="cb22-4"><a href="#cb22-4" tabindex="-1"></a>  <span class="fu">rbind</span>(<span class="st">&quot;(Intercept)&quot;</span> <span class="ot">=</span> m_en<span class="sc">$</span>a0, m_en<span class="sc">$</span>beta)</span>
-<span id="cb22-5"><a href="#cb22-5" tabindex="-1"></a>)</span>
-<span id="cb22-6"><a href="#cb22-6" tabindex="-1"></a><span class="fu">colnames</span>(regMethodResult) <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">&quot;ridge&quot;</span>, <span class="st">&quot;Lasso&quot;</span>, <span class="st">&quot;ElasN&quot;</span>)</span>
-<span id="cb22-7"><a href="#cb22-7" tabindex="-1"></a>regMethodResult</span></code></pre></div>
+<span id="cb20-4"><a href="#cb20-4" tabindex="-1"></a><span class="co"># Visualize the tuning results</span></span>
+<span id="cb20-5"><a href="#cb20-5" tabindex="-1"></a>nl <span class="ot">&lt;-</span> <span class="dv">71</span></span>
+<span id="cb20-6"><a href="#cb20-6" tabindex="-1"></a><span class="fu">plot</span>(las_cv<span class="sc">$</span>lambda[<span class="dv">1</span><span class="sc">:</span>nl], las_cv<span class="sc">$</span>cvm[<span class="dv">1</span><span class="sc">:</span>nl], <span class="at">type =</span> <span class="st">&quot;l&quot;</span>, </span>
+<span id="cb20-7"><a href="#cb20-7" tabindex="-1"></a>     <span class="at">xlab =</span> <span class="st">&quot;lambda&quot;</span>, <span class="at">ylab =</span> <span class="st">&quot;cvm&quot;</span>, <span class="at">main =</span> <span class="st">&quot;Lasso Reg.&quot;</span>)</span>
+<span id="cb20-8"><a href="#cb20-8" tabindex="-1"></a><span class="fu">points</span>(las_cv<span class="sc">$</span>lambda[<span class="dv">1</span><span class="sc">:</span>nl], las_cv<span class="sc">$</span>cvup[<span class="dv">1</span><span class="sc">:</span>nl], <span class="at">type =</span> <span class="st">&quot;l&quot;</span>, <span class="at">lty =</span> <span class="dv">2</span>)</span>
+<span id="cb20-9"><a href="#cb20-9" tabindex="-1"></a><span class="fu">points</span>(las_cv<span class="sc">$</span>lambda[<span class="dv">1</span><span class="sc">:</span>nl], las_cv<span class="sc">$</span>cvlo[<span class="dv">1</span><span class="sc">:</span>nl], <span class="at">type =</span> <span class="st">&quot;l&quot;</span>, <span class="at">lty =</span> <span class="dv">2</span>)</span></code></pre></div>
+<p><img role="img" src="data:image/png;base64,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" /><!-- --></p>
+<div class="sourceCode" id="cb21"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb21-1"><a href="#cb21-1" tabindex="-1"></a><span class="co"># Refit Lasso with proper lambda</span></span>
+<span id="cb21-2"><a href="#cb21-2" tabindex="-1"></a>m_las <span class="ot">&lt;-</span> <span class="fu">glmnet</span>(modelmat, y, <span class="at">family =</span> <span class="st">&quot;gaussian&quot;</span>, <span class="at">alpha =</span> <span class="dv">1</span>,</span>
+<span id="cb21-3"><a href="#cb21-3" tabindex="-1"></a>                <span class="at">standardize =</span> <span class="cn">TRUE</span>, <span class="at">intercept =</span> <span class="cn">TRUE</span>,</span>
+<span id="cb21-4"><a href="#cb21-4" tabindex="-1"></a>                <span class="at">lambda =</span> las_cv<span class="sc">$</span>lambda<span class="fl">.1</span>se)</span></code></pre></div>
+<div class="sourceCode" id="cb22"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb22-1"><a href="#cb22-1" tabindex="-1"></a><span class="co"># Fit Elastic net and tune lambda via CV</span></span>
+<span id="cb22-2"><a href="#cb22-2" tabindex="-1"></a>en_cv <span class="ot">&lt;-</span> <span class="fu">cv.glmnet</span>(modelmat, y, <span class="at">family =</span> <span class="st">&quot;gaussian&quot;</span>, <span class="at">alpha =</span> <span class="fl">0.3</span>,</span>
+<span id="cb22-3"><a href="#cb22-3" tabindex="-1"></a>                   <span class="at">standardize =</span> <span class="cn">TRUE</span>, <span class="at">intercept =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb22-4"><a href="#cb22-4" tabindex="-1"></a><span class="co"># Visualize the tuning results</span></span>
+<span id="cb22-5"><a href="#cb22-5" tabindex="-1"></a><span class="fu">plot</span>(en_cv<span class="sc">$</span>lambda, en_cv<span class="sc">$</span>cvm, <span class="at">type =</span> <span class="st">&quot;l&quot;</span>, </span>
+<span id="cb22-6"><a href="#cb22-6" tabindex="-1"></a>     <span class="at">xlab =</span> <span class="st">&quot;lambda&quot;</span>, <span class="at">ylab =</span> <span class="st">&quot;cvm&quot;</span>, <span class="at">main =</span> <span class="st">&quot;Elastic Net Reg.&quot;</span>)</span></code></pre></div>
+<p><img role="img" src="data:image/png;base64,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" /><!-- --></p>
+<div class="sourceCode" id="cb23"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb23-1"><a href="#cb23-1" tabindex="-1"></a><span class="co"># Refit Elastic net with proper lambda</span></span>
+<span id="cb23-2"><a href="#cb23-2" tabindex="-1"></a>m_en <span class="ot">&lt;-</span> <span class="fu">glmnet</span>(modelmat, y, <span class="at">family =</span> <span class="st">&quot;gaussian&quot;</span>, <span class="at">alpha =</span> <span class="fl">0.3</span>,</span>
+<span id="cb23-3"><a href="#cb23-3" tabindex="-1"></a>               <span class="at">standardize =</span> <span class="cn">TRUE</span>, <span class="at">intercept =</span> <span class="cn">TRUE</span>,</span>
+<span id="cb23-4"><a href="#cb23-4" tabindex="-1"></a>               <span class="at">lambda =</span> en_cv<span class="sc">$</span>lambda<span class="fl">.1</span>se)</span></code></pre></div>
+<p>比較 Ridge、Lasso、Elastic net <span class="math inline">\((\alpha=0.3)\)</span> regression
+coefficients。</p>
+<div class="sourceCode" id="cb24"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb24-1"><a href="#cb24-1" tabindex="-1"></a>regMethodResult <span class="ot">&lt;-</span> <span class="fu">cbind</span>(</span>
+<span id="cb24-2"><a href="#cb24-2" tabindex="-1"></a>  <span class="fu">rbind</span>(<span class="st">&quot;(Intercept)&quot;</span> <span class="ot">=</span> m_rid<span class="sc">$</span>a0, m_rid<span class="sc">$</span>beta),</span>
+<span id="cb24-3"><a href="#cb24-3" tabindex="-1"></a>  <span class="fu">rbind</span>(<span class="st">&quot;(Intercept)&quot;</span> <span class="ot">=</span> m_las<span class="sc">$</span>a0, m_las<span class="sc">$</span>beta),</span>
+<span id="cb24-4"><a href="#cb24-4" tabindex="-1"></a>  <span class="fu">rbind</span>(<span class="st">&quot;(Intercept)&quot;</span> <span class="ot">=</span> m_en<span class="sc">$</span>a0, m_en<span class="sc">$</span>beta)</span>
+<span id="cb24-5"><a href="#cb24-5" tabindex="-1"></a>)</span>
+<span id="cb24-6"><a href="#cb24-6" tabindex="-1"></a><span class="fu">colnames</span>(regMethodResult) <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">&quot;ridge&quot;</span>, <span class="st">&quot;Lasso&quot;</span>, <span class="st">&quot;ElasN&quot;</span>)</span>
+<span id="cb24-7"><a href="#cb24-7" tabindex="-1"></a>regMethodResult</span></code></pre></div>
 <pre><code>## 12 x 3 sparse Matrix of class &quot;dgCMatrix&quot;
 ##                    ridge        Lasso        ElasN
 ## (Intercept) -485.5743614 -466.2625966 -473.0667662
@@ -381,25 +424,34 @@ such that error is within 1 standard error of the minimum.</p></li>
 </div>
 <div id="group-lasso-sparse-group-lasso" class="section level3">
 <h3>Group Lasso &amp; Sparse Group Lasso</h3>
-<p>Regularization Method</p>
-<div class="sourceCode" id="cb24"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb24-1"><a href="#cb24-1" tabindex="-1"></a><span class="fu">library</span>(gglasso)</span></code></pre></div>
-<div class="sourceCode" id="cb25"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb25-1"><a href="#cb25-1" tabindex="-1"></a><span class="fu">names</span>(creDf)</span></code></pre></div>
-<pre><code>##  [1] &quot;Income&quot;    &quot;Limit&quot;     &quot;Rating&quot;    &quot;Cards&quot;     &quot;Age&quot;       &quot;Education&quot;
-##  [7] &quot;Own&quot;       &quot;Student&quot;   &quot;Married&quot;   &quot;Region&quot;    &quot;Balance&quot;</code></pre>
-<div class="sourceCode" id="cb27"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb27-1"><a href="#cb27-1" tabindex="-1"></a>modelmat2fi <span class="ot">&lt;-</span> <span class="fu">model.matrix</span>(</span>
-<span id="cb27-2"><a href="#cb27-2" tabindex="-1"></a>  Balance <span class="sc">~</span> . <span class="sc">+</span> Income <span class="sc">*</span> (Age <span class="sc">+</span> Education <span class="sc">+</span> Own <span class="sc">+</span> Student), <span class="at">data =</span> creDf</span>
-<span id="cb27-3"><a href="#cb27-3" tabindex="-1"></a>)[,<span class="sc">-</span><span class="dv">1</span>]</span>
-<span id="cb27-4"><a href="#cb27-4" tabindex="-1"></a><span class="fu">colnames</span>(modelmat2fi)</span></code></pre></div>
+<p>本節介紹兩種基於常用 Regularization Method
+的延伸方法，與常用方法獨立對變數的迴歸係數進行壓縮不同，以下介紹的兩種方法為
+Group Lasso 及 Sparse Group
+Lasso，使用上首先由使用者主觀方式將解釋變數分組，模型針對各組變數的迴歸係數加上逞罰效果，使整組變數一次被挑選出或剔除掉。</p>
+<p>同樣以信用卡資料作為範例，除了各變數的主作用之外，再加入與
+<code>Income</code> 相關的交互作用項:
+<code>Income:Age</code>、<code>Income:Education</code>、<code>Income:Own</code>、<code>Income:Student</code>。</p>
+<p>先將資料依照需求整理成 <code>model.matrix</code> 格式。</p>
+<div class="sourceCode" id="cb26"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb26-1"><a href="#cb26-1" tabindex="-1"></a>modelmat2fi <span class="ot">&lt;-</span> <span class="fu">model.matrix</span>(</span>
+<span id="cb26-2"><a href="#cb26-2" tabindex="-1"></a>  Balance <span class="sc">~</span> . <span class="sc">+</span> Income <span class="sc">*</span> (Age <span class="sc">+</span> Education <span class="sc">+</span> Own <span class="sc">+</span> Student), <span class="at">data =</span> creDf</span>
+<span id="cb26-3"><a href="#cb26-3" tabindex="-1"></a>)[,<span class="sc">-</span><span class="dv">1</span>] <span class="co"># Remove intercept from the model matrix</span></span>
+<span id="cb26-4"><a href="#cb26-4" tabindex="-1"></a><span class="fu">colnames</span>(modelmat2fi)</span></code></pre></div>
 <pre><code>##  [1] &quot;Income&quot;            &quot;Limit&quot;             &quot;Rating&quot;           
 ##  [4] &quot;Cards&quot;             &quot;Age&quot;               &quot;Education&quot;        
 ##  [7] &quot;OwnYes&quot;            &quot;StudentYes&quot;        &quot;MarriedYes&quot;       
 ## [10] &quot;RegionSouth&quot;       &quot;RegionWest&quot;        &quot;Income:Age&quot;       
 ## [13] &quot;Income:Education&quot;  &quot;Income:OwnYes&quot;     &quot;Income:StudentYes&quot;</code></pre>
-<div class="sourceCode" id="cb29"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb29-1"><a href="#cb29-1" tabindex="-1"></a>twofi_group <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="dv">1</span>, <span class="dv">2</span>, <span class="dv">3</span>, <span class="dv">4</span>, <span class="dv">1</span>, </span>
-<span id="cb29-2"><a href="#cb29-2" tabindex="-1"></a>                 <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">5</span>, <span class="dv">6</span>, </span>
-<span id="cb29-3"><a href="#cb29-3" tabindex="-1"></a>                 <span class="dv">6</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>)</span>
-<span id="cb29-4"><a href="#cb29-4" tabindex="-1"></a><span class="fu">names</span>(twofi_group) <span class="ot">&lt;-</span> <span class="fu">colnames</span>(modelmat2fi)</span>
-<span id="cb29-5"><a href="#cb29-5" tabindex="-1"></a>twofi_group</span></code></pre></div>
+<p>手動將 <code>model.matrix</code> 的欄位分組，期望：</p>
+<ul>
+<li>與 <code>Income</code> 相關的交互作用項及其主作用皆為同一組</li>
+<li><code>Region</code>轉換出的兩個 Dummy variables 為同一組</li>
+<li>其他變數各自為一組</li>
+</ul>
+<div class="sourceCode" id="cb28"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb28-1"><a href="#cb28-1" tabindex="-1"></a>twofi_group <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="dv">1</span>, <span class="dv">2</span>, <span class="dv">3</span>, <span class="dv">4</span>, <span class="dv">1</span>, </span>
+<span id="cb28-2"><a href="#cb28-2" tabindex="-1"></a>                 <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">5</span>, <span class="dv">6</span>, </span>
+<span id="cb28-3"><a href="#cb28-3" tabindex="-1"></a>                 <span class="dv">6</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>)</span>
+<span id="cb28-4"><a href="#cb28-4" tabindex="-1"></a><span class="fu">names</span>(twofi_group) <span class="ot">&lt;-</span> <span class="fu">colnames</span>(modelmat2fi)</span>
+<span id="cb28-5"><a href="#cb28-5" tabindex="-1"></a>twofi_group</span></code></pre></div>
 <pre><code>##            Income             Limit            Rating             Cards 
 ##                 1                 2                 3                 4 
 ##               Age         Education            OwnYes        StudentYes 
@@ -408,86 +460,89 @@ such that error is within 1 standard error of the minimum.</p></li>
 ##                 5                 6                 6                 1 
 ##  Income:Education     Income:OwnYes Income:StudentYes 
 ##                 1                 1                 1</code></pre>
+<p>套件 <strong>gglasso</strong> 為 Group Lasso Regression
+的建模套件，使用方法類似於 <strong>glmnet</strong> 套件，差別在於需要在
+<code>group</code> 項輸入變數分組。</p>
+<p>文件連結<a href="https://cran.r-project.org/web/packages/gglasso/index.html">點此</a></p>
+<div class="sourceCode" id="cb30"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb30-1"><a href="#cb30-1" tabindex="-1"></a><span class="fu">library</span>(gglasso)</span></code></pre></div>
+<p>以下為使用 Group Lasso 分析信用卡資料內指定交互作用項的示範程式</p>
 <div class="sourceCode" id="cb31"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb31-1"><a href="#cb31-1" tabindex="-1"></a><span class="co"># Group Lasso: choose best lambda</span></span>
 <span id="cb31-2"><a href="#cb31-2" tabindex="-1"></a>glas_cv <span class="ot">&lt;-</span> <span class="fu">cv.gglasso</span>(modelmat2fi, y, <span class="at">group =</span> twofi_group, <span class="at">loss =</span> <span class="st">&quot;ls&quot;</span>)</span>
-<span id="cb31-3"><a href="#cb31-3" tabindex="-1"></a>glas_cv<span class="sc">$</span>lambda.min</span></code></pre></div>
-<pre><code>## [1] 463.1081</code></pre>
-<div class="sourceCode" id="cb33"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb33-1"><a href="#cb33-1" tabindex="-1"></a>glas_cv<span class="sc">$</span>lambda<span class="fl">.1</span>se</span></code></pre></div>
-<pre><code>## [1] 703.8832</code></pre>
-<div class="sourceCode" id="cb35"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb35-1"><a href="#cb35-1" tabindex="-1"></a>m_glas <span class="ot">&lt;-</span> <span class="fu">gglasso</span>(modelmat2fi, y, <span class="at">group =</span> twofi_group, <span class="at">loss =</span> <span class="st">&quot;ls&quot;</span>,</span>
-<span id="cb35-2"><a href="#cb35-2" tabindex="-1"></a>                  <span class="at">lambda =</span> glas_cv<span class="sc">$</span>lambda<span class="fl">.1</span>se)</span>
-<span id="cb35-3"><a href="#cb35-3" tabindex="-1"></a>m_glas<span class="sc">$</span>b0</span></code></pre></div>
-<pre><code>##        s0 
-## -389.6498</code></pre>
-<div class="sourceCode" id="cb37"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb37-1"><a href="#cb37-1" tabindex="-1"></a>m_glas<span class="sc">$</span>beta</span></code></pre></div>
-<pre><code>##                              s0
-## Income            -0.0884491922
-## Limit              0.2442491810
-## Rating             0.0569317308
-## Cards              0.0051052969
-## Age                0.0561660112
-## Education          0.0115134930
-## OwnYes             0.0006305481
-## StudentYes         0.0035620841
-## MarriedYes        -0.0007560787
-## RegionSouth        0.0000000000
-## RegionWest         0.0000000000
-## Income:Age        -0.0564469812
-## Income:Education  -0.1916975982
-## Income:OwnYes     -0.6481019624
-## Income:StudentYes  2.6717643773</code></pre>
-<div class="sourceCode" id="cb39"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb39-1"><a href="#cb39-1" tabindex="-1"></a><span class="fu">library</span>(sparsegl)</span></code></pre></div>
-<div class="sourceCode" id="cb40"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb40-1"><a href="#cb40-1" tabindex="-1"></a><span class="co"># Sparse group lasso  application to modeling 2fi</span></span>
-<span id="cb40-2"><a href="#cb40-2" tabindex="-1"></a><span class="co"># Sparse Group Lasso: choose best lambda using CV</span></span>
-<span id="cb40-3"><a href="#cb40-3" tabindex="-1"></a><span class="co">#</span></span>
-<span id="cb40-4"><a href="#cb40-4" tabindex="-1"></a>sglas_cv <span class="ot">&lt;-</span> <span class="fu">cv.sparsegl</span>(modelmat2fi, y, <span class="at">group =</span> twofi_group, <span class="at">family =</span> <span class="st">&quot;gaussian&quot;</span>,</span>
-<span id="cb40-5"><a href="#cb40-5" tabindex="-1"></a>                        <span class="at">asparse =</span> <span class="fl">0.05</span>) <span class="co"># set weight of L1-penalty as 0.05</span></span>
-<span id="cb40-6"><a href="#cb40-6" tabindex="-1"></a>sglas_cv<span class="sc">$</span>lambda.min</span></code></pre></div>
-<pre><code>## [1] 0.008138499</code></pre>
-<div class="sourceCode" id="cb42"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb42-1"><a href="#cb42-1" tabindex="-1"></a>sglas_cv<span class="sc">$</span>lambda<span class="fl">.1</span>se</span></code></pre></div>
-<pre><code>## [1] 0.1455692</code></pre>
-<div class="sourceCode" id="cb44"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb44-1"><a href="#cb44-1" tabindex="-1"></a>m_sglas <span class="ot">&lt;-</span> <span class="fu">sparsegl</span>(modelmat2fi, y, <span class="at">group =</span> twofi_group, <span class="at">family =</span> <span class="st">&quot;gaussian&quot;</span>,</span>
-<span id="cb44-2"><a href="#cb44-2" tabindex="-1"></a>                    <span class="at">lambda =</span> sglas_cv<span class="sc">$</span>lambda<span class="fl">.1</span>se, <span class="at">asparse =</span> <span class="fl">0.05</span>)</span>
-<span id="cb44-3"><a href="#cb44-3" tabindex="-1"></a>m_sglas<span class="sc">$</span>b0</span></code></pre></div>
-<pre><code>##        s0 
-## -457.2506</code></pre>
-<div class="sourceCode" id="cb46"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb46-1"><a href="#cb46-1" tabindex="-1"></a>m_sglas<span class="sc">$</span>beta</span></code></pre></div>
-<pre><code>## 15 x 1 sparse Matrix of class &quot;dgCMatrix&quot;
-##                              s0
-## Income             -6.254480382
-## Limit               0.137061027
-## Rating              1.639950072
-## Cards              15.173613269
-## Age                -0.446471816
-## Education          -0.581407324
-## OwnYes             -8.540847901
-## StudentYes        416.645139961
-## MarriedYes         -8.397388013
-## RegionSouth         .          
-## RegionWest          1.099669478
-## Income:Age         -0.005964242
-## Income:Education    .          
-## Income:OwnYes       .          
-## Income:StudentYes   .</code></pre>
+<span id="cb31-3"><a href="#cb31-3" tabindex="-1"></a><span class="co"># Refit Group Lasso with proper lambda</span></span>
+<span id="cb31-4"><a href="#cb31-4" tabindex="-1"></a>m_glas <span class="ot">&lt;-</span> <span class="fu">gglasso</span>(modelmat2fi, y, <span class="at">group =</span> twofi_group, <span class="at">loss =</span> <span class="st">&quot;ls&quot;</span>,</span>
+<span id="cb31-5"><a href="#cb31-5" tabindex="-1"></a>                  <span class="at">lambda =</span> glas_cv<span class="sc">$</span>lambda<span class="fl">.1</span>se)</span></code></pre></div>
+<p><strong>Sparse Group Lasso</strong> 相較於 Group Lasso
+多了在同一組變數內增加 L1-penalty
+，使得模型除了對各組變數的迴歸係數進行壓縮外，同時也組內的各變數進行迴歸係數壓縮，因此，Sparse
+Group Lasso
+首先判斷一整組變數是否為關鍵變數組，再從組內挑出關鍵變數。</p>
+<p>文件連結<a href="https://cran.r-project.org/web/packages/sparsegl/index.html">點此</a></p>
+<p>使用方法類似 <strong>gglasso</strong> 及 <strong>glmnet</strong>
+套件，惟須要設定 <code>asparse</code> L1-penalty
+的懲罰程度，<code>asparse</code>
+越大，表示組內變數迴歸係數的壓縮程度越大。</p>
+<div class="sourceCode" id="cb32"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb32-1"><a href="#cb32-1" tabindex="-1"></a><span class="fu">library</span>(sparsegl)</span></code></pre></div>
+<p>以下為使用 Sparse Group Lasso
+分析信用卡資料內指定交互作用項的示範程式</p>
+<div class="sourceCode" id="cb33"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb33-1"><a href="#cb33-1" tabindex="-1"></a><span class="co"># Sparse Group Lasso: choose best lambda using CV</span></span>
+<span id="cb33-2"><a href="#cb33-2" tabindex="-1"></a>sglas_cv <span class="ot">&lt;-</span> <span class="fu">cv.sparsegl</span>(modelmat2fi, y, <span class="at">group =</span> twofi_group, <span class="at">family =</span> <span class="st">&quot;gaussian&quot;</span>,</span>
+<span id="cb33-3"><a href="#cb33-3" tabindex="-1"></a>                        <span class="at">asparse =</span> <span class="fl">0.05</span>) <span class="co"># set weight of L1-penalty as 0.05</span></span>
+<span id="cb33-4"><a href="#cb33-4" tabindex="-1"></a><span class="co"># Refit Sparse Group Lasso with proper lambda</span></span>
+<span id="cb33-5"><a href="#cb33-5" tabindex="-1"></a>m_sglas <span class="ot">&lt;-</span> <span class="fu">sparsegl</span>(modelmat2fi, y, <span class="at">group =</span> twofi_group, <span class="at">family =</span> <span class="st">&quot;gaussian&quot;</span>,</span>
+<span id="cb33-6"><a href="#cb33-6" tabindex="-1"></a>                    <span class="at">lambda =</span> sglas_cv<span class="sc">$</span>lambda<span class="fl">.1</span>se, <span class="at">asparse =</span> <span class="fl">0.05</span>)</span></code></pre></div>
+<p>比較 Group Lasso、Sparse Group Lasso <span class="math inline">\((\alpha=0.05)\)</span> regression
+coefficients。</p>
+<div class="sourceCode" id="cb34"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb34-1"><a href="#cb34-1" tabindex="-1"></a>advRegMethodResult <span class="ot">&lt;-</span> <span class="fu">cbind</span>(</span>
+<span id="cb34-2"><a href="#cb34-2" tabindex="-1"></a>  <span class="fu">rbind</span>(<span class="st">&quot;(Intercept)&quot;</span> <span class="ot">=</span> m_glas<span class="sc">$</span>b0, m_glas<span class="sc">$</span>beta),</span>
+<span id="cb34-3"><a href="#cb34-3" tabindex="-1"></a>  <span class="fu">rbind</span>(<span class="st">&quot;(Intercept)&quot;</span> <span class="ot">=</span> m_sglas<span class="sc">$</span>b0, m_sglas<span class="sc">$</span>beta)</span>
+<span id="cb34-4"><a href="#cb34-4" tabindex="-1"></a>)</span>
+<span id="cb34-5"><a href="#cb34-5" tabindex="-1"></a><span class="fu">colnames</span>(advRegMethodResult) <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">&quot;GroupLasso&quot;</span>, <span class="st">&quot;SGLasso&quot;</span>)</span>
+<span id="cb34-6"><a href="#cb34-6" tabindex="-1"></a>advRegMethodResult</span></code></pre></div>
+<pre><code>## 16 x 2 sparse Matrix of class &quot;dgCMatrix&quot;
+##                      GroupLasso       SGLasso
+## (Intercept)       -3.896498e+02 -4.572506e+02
+## Income            -8.844919e-02 -6.254480e+00
+## Limit              2.442492e-01  1.370610e-01
+## Rating             5.693173e-02  1.639950e+00
+## Cards              5.105297e-03  1.517361e+01
+## Age                5.616601e-02 -4.464718e-01
+## Education          1.151349e-02 -5.814073e-01
+## OwnYes             6.305481e-04 -8.540848e+00
+## StudentYes         3.562084e-03  4.166451e+02
+## MarriedYes        -7.560787e-04 -8.397388e+00
+## RegionSouth        .             .           
+## RegionWest         .             1.099669e+00
+## Income:Age        -5.644698e-02 -5.964242e-03
+## Income:Education  -1.916976e-01  .           
+## Income:OwnYes     -6.481020e-01  .           
+## Income:StudentYes  2.671764e+00  .</code></pre>
 </div>
 </div>
 <div id="sure-independence-screening-for-ultrahigh-dimensional-data" class="section level2">
 <h2>Sure Independence Screening for Ultrahigh Dimensional Data</h2>
-<div class="sourceCode" id="cb48"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb48-1"><a href="#cb48-1" tabindex="-1"></a><span class="fu">library</span>(SIS)</span></code></pre></div>
-<div class="sourceCode" id="cb49"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb49-1"><a href="#cb49-1" tabindex="-1"></a><span class="co"># Sure independence screening</span></span>
-<span id="cb49-2"><a href="#cb49-2" tabindex="-1"></a><span class="fu">data</span>(leukemia.train)</span>
-<span id="cb49-3"><a href="#cb49-3" tabindex="-1"></a><span class="co"># response vatiable: V7130</span></span>
-<span id="cb49-4"><a href="#cb49-4" tabindex="-1"></a><span class="fu">dim</span>(leukemia.train)</span></code></pre></div>
+<p>套件 <strong>SIS</strong> 為 Sure Independence Screening
+的實作套件，用於超高維度的變數選擇問題。</p>
+<p>文件連結<a href="https://cran.r-project.org/web/packages/SIS/index.html">點此</a></p>
+<div class="sourceCode" id="cb36"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb36-1"><a href="#cb36-1" tabindex="-1"></a><span class="fu">library</span>(SIS)</span></code></pre></div>
+<p>以套件 <strong>SIS</strong> 內建的 <code>leukemia.train</code>
+資料作為示範例，該資料共有 38 筆資料，及 7129
+個解釋變數（<code>V1</code> ~ <code>V7129</code>），欄位
+<code>V7130</code> 為二元反應變數。</p>
+<div class="sourceCode" id="cb37"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb37-1"><a href="#cb37-1" tabindex="-1"></a><span class="co"># Sure independence screening</span></span>
+<span id="cb37-2"><a href="#cb37-2" tabindex="-1"></a><span class="fu">data</span>(leukemia.train)</span>
+<span id="cb37-3"><a href="#cb37-3" tabindex="-1"></a><span class="co"># response vatiable: V7130</span></span>
+<span id="cb37-4"><a href="#cb37-4" tabindex="-1"></a><span class="fu">dim</span>(leukemia.train)</span></code></pre></div>
 <pre><code>## [1]   38 7130</code></pre>
-<div class="sourceCode" id="cb51"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb51-1"><a href="#cb51-1" tabindex="-1"></a><span class="co"># [1]   38 7130</span></span>
-<span id="cb51-2"><a href="#cb51-2" tabindex="-1"></a><span class="co"># WRONG: use glm to fit the ultrahigh dimensional leukemia data</span></span>
-<span id="cb51-3"><a href="#cb51-3" tabindex="-1"></a>glm_lkm <span class="ot">&lt;-</span> <span class="fu">glm</span>(V7130 <span class="sc">~</span> ., <span class="at">data =</span> leukemia.train,</span>
-<span id="cb51-4"><a href="#cb51-4" tabindex="-1"></a>               <span class="at">family =</span> <span class="fu">binomial</span>(<span class="at">link =</span> <span class="st">&quot;logit&quot;</span>))</span>
-<span id="cb51-5"><a href="#cb51-5" tabindex="-1"></a><span class="co"># summary(glm_lkm)</span></span>
-<span id="cb51-6"><a href="#cb51-6" tabindex="-1"></a><span class="fu">dim</span>(<span class="fu">summary</span>(glm_lkm)<span class="sc">$</span>coefficients)</span></code></pre></div>
+<div class="sourceCode" id="cb39"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb39-1"><a href="#cb39-1" tabindex="-1"></a><span class="co"># [1]   38 7130</span></span></code></pre></div>
+<p>若直接以 <code>glm</code> 建立 Logistic
+Regression，若不注意，函數並不會回傳任何有關維度過大的警告訊息，且最多只會輸出同樣本數數量的參數估計結果，且估計值通常極不穩定，無法從模型解讀出太多資訊。</p>
+<div class="sourceCode" id="cb40"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb40-1"><a href="#cb40-1" tabindex="-1"></a><span class="co"># WRONG: use glm to fit the ultrahigh dimensional leukemia data</span></span>
+<span id="cb40-2"><a href="#cb40-2" tabindex="-1"></a>glm_lkm <span class="ot">&lt;-</span> <span class="fu">glm</span>(V7130 <span class="sc">~</span> ., <span class="at">data =</span> leukemia.train, <span class="at">family =</span> <span class="fu">binomial</span>(<span class="at">link =</span> <span class="st">&quot;logit&quot;</span>))</span>
+<span id="cb40-3"><a href="#cb40-3" tabindex="-1"></a><span class="co"># summary(glm_lkm)</span></span>
+<span id="cb40-4"><a href="#cb40-4" tabindex="-1"></a><span class="fu">dim</span>(<span class="fu">summary</span>(glm_lkm)<span class="sc">$</span>coefficients)</span></code></pre></div>
 <pre><code>## [1] 38  4</code></pre>
-<div class="sourceCode" id="cb53"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb53-1"><a href="#cb53-1" tabindex="-1"></a><span class="co"># [1] 38  4</span></span>
-<span id="cb53-2"><a href="#cb53-2" tabindex="-1"></a><span class="fu">head</span>(<span class="fu">summary</span>(glm_lkm)<span class="sc">$</span>coefficients, <span class="dv">6</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb42"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb42-1"><a href="#cb42-1" tabindex="-1"></a><span class="co"># [1] 38  4</span></span>
+<span id="cb42-2"><a href="#cb42-2" tabindex="-1"></a><span class="fu">head</span>(<span class="fu">summary</span>(glm_lkm)<span class="sc">$</span>coefficients, <span class="dv">6</span>)</span></code></pre></div>
 <pre><code>##                  Estimate Std. Error       z value  Pr(&gt;|z|)
 ## (Intercept) -231.02189573 5812816.43 -3.974354e-05 0.9999683
 ## V1            -0.75005637   16617.30 -4.513709e-05 0.9999640
@@ -495,38 +550,37 @@ such that error is within 1 standard error of the minimum.</p></li>
 ## V3            -1.65707989   38300.02 -4.326577e-05 0.9999655
 ## V4             0.01247885    2771.09  4.503229e-06 0.9999964
 ## V5            -0.65855105   16801.24 -3.919656e-05 0.9999687</code></pre>
-<div class="sourceCode" id="cb55"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb55-1"><a href="#cb55-1" tabindex="-1"></a><span class="co"># SIS method</span></span>
-<span id="cb55-2"><a href="#cb55-2" tabindex="-1"></a>lkm_x <span class="ot">&lt;-</span> <span class="fu">model.matrix</span>(V7130 <span class="sc">~</span> ., <span class="at">data =</span> leukemia.train)[,<span class="sc">-</span><span class="dv">1</span>]</span>
-<span id="cb55-3"><a href="#cb55-3" tabindex="-1"></a>lkm_y <span class="ot">&lt;-</span> leukemia.train[,<span class="dv">7130</span>]</span>
-<span id="cb55-4"><a href="#cb55-4" tabindex="-1"></a>sis_lkm <span class="ot">&lt;-</span> <span class="fu">SIS</span>(lkm_x, lkm_y, <span class="at">family =</span> <span class="st">&quot;binomial&quot;</span>, <span class="at">penalty =</span> <span class="st">&quot;lasso&quot;</span>,</span>
-<span id="cb55-5"><a href="#cb55-5" tabindex="-1"></a>               <span class="at">tune =</span> <span class="st">&quot;bic&quot;</span>, <span class="at">seed =</span> <span class="dv">1</span>) <span class="co">#, varISIS = &quot;vanilla&quot;</span></span></code></pre></div>
+<p>若遇到超高維度的分析問題，可先嘗試使用 SIS
+對分析資料進行降維，以下為使用 SIS 分析 <code>leukemia.train</code>
+資料的示範程式。</p>
+<p>將解釋變數整理成 <code>model.matrix</code>
+格式，並指定反應變數向量。</p>
+<div class="sourceCode" id="cb44"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb44-1"><a href="#cb44-1" tabindex="-1"></a><span class="co"># SIS method</span></span>
+<span id="cb44-2"><a href="#cb44-2" tabindex="-1"></a>lkm_x <span class="ot">&lt;-</span> <span class="fu">model.matrix</span>(V7130 <span class="sc">~</span> ., <span class="at">data =</span> leukemia.train)[,<span class="sc">-</span><span class="dv">1</span>]</span>
+<span id="cb44-3"><a href="#cb44-3" tabindex="-1"></a>lkm_y <span class="ot">&lt;-</span> leukemia.train[,<span class="dv">7130</span>]</span>
+<span id="cb44-4"><a href="#cb44-4" tabindex="-1"></a>sis_lkm <span class="ot">&lt;-</span> <span class="fu">SIS</span>(lkm_x, lkm_y, <span class="at">family =</span> <span class="st">&quot;binomial&quot;</span>, <span class="at">penalty =</span> <span class="st">&quot;lasso&quot;</span>,</span>
+<span id="cb44-5"><a href="#cb44-5" tabindex="-1"></a>               <span class="at">tune =</span> <span class="st">&quot;bic&quot;</span>, <span class="at">seed =</span> <span class="dv">1</span>) <span class="co">#, varISIS = &quot;vanilla&quot;</span></span></code></pre></div>
 <pre><code>## Iter 1 , screening:  3320 
 ## Iter 1 , selection:  3320 
 ## Iter 1 , conditional-screening:  847 
 ## Iter 2 , screening:  847 3320 
 ## Iter 2 , selection:  847 3320 
 ## Maximum number of variables selected</code></pre>
-<div class="sourceCode" id="cb57"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb57-1"><a href="#cb57-1" tabindex="-1"></a><span class="co"># SIS selected</span></span>
-<span id="cb57-2"><a href="#cb57-2" tabindex="-1"></a><span class="fu">colnames</span>(lkm_x)[sis_lkm<span class="sc">$</span>ix]</span></code></pre></div>
+<div class="sourceCode" id="cb46"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb46-1"><a href="#cb46-1" tabindex="-1"></a><span class="co"># SIS selected</span></span>
+<span id="cb46-2"><a href="#cb46-2" tabindex="-1"></a><span class="fu">colnames</span>(lkm_x)[sis_lkm<span class="sc">$</span>ix]</span></code></pre></div>
 <pre><code>## [1] &quot;V847&quot;  &quot;V3320&quot;</code></pre>
-<div class="sourceCode" id="cb59"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb59-1"><a href="#cb59-1" tabindex="-1"></a><span class="co"># [1] &quot;V3320&quot; &quot;V3810&quot;</span></span>
-<span id="cb59-2"><a href="#cb59-2" tabindex="-1"></a>lkm_x_sis <span class="ot">&lt;-</span> lkm_x[,sis_lkm<span class="sc">$</span>ix]</span>
-<span id="cb59-3"><a href="#cb59-3" tabindex="-1"></a></span>
-<span id="cb59-4"><a href="#cb59-4" tabindex="-1"></a><span class="fu">ggpairs</span>(<span class="fu">data.frame</span>(<span class="fu">cbind</span>(lkm_x_sis, <span class="at">y =</span> lkm_y)),</span>
-<span id="cb59-5"><a href="#cb59-5" tabindex="-1"></a>        <span class="fu">aes</span>(<span class="at">colour =</span> <span class="fu">as.factor</span>(lkm_y), <span class="at">alpha =</span> <span class="fl">0.4</span>))</span></code></pre></div>
+<p>根據 SIS 結果，僅從 <code>leukemia.train</code>
+資料中解析出兩個重要變數 V847 及 V3320，可作圖觀察此變數分別於
+<code>y=0</code> 及 <code>y=1</code> 時的分布，較容易看出於 Y
+不同時，此兩變數的數值分布具有視覺上的差異。</p>
+<div class="sourceCode" id="cb48"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb48-1"><a href="#cb48-1" tabindex="-1"></a>lkm_x_sis <span class="ot">&lt;-</span> lkm_x[,sis_lkm<span class="sc">$</span>ix]</span>
+<span id="cb48-2"><a href="#cb48-2" tabindex="-1"></a><span class="fu">ggpairs</span>(<span class="fu">data.frame</span>(<span class="fu">cbind</span>(lkm_x_sis, <span class="at">y =</span> lkm_y)),</span>
+<span id="cb48-3"><a href="#cb48-3" tabindex="-1"></a>        <span class="fu">aes</span>(<span class="at">colour =</span> <span class="fu">as.factor</span>(lkm_y), <span class="at">alpha =</span> <span class="fl">0.4</span>))</span></code></pre></div>
 <p><img role="img" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAqAAAAHgCAMAAABNUi8GAAACTFBMVEUAAAAAaWwAv8QAv88Av9gAyuIA1ewCv8QFwMUKwcYKwsYWw8gXxckZGT8ZGWIZP4EZYp8aGhowyMwzMzM0zNA6v8Q6v886v9g6ys86yuI64PU/GRk/GT8/GWI/Pxk/P2I/P4E/Yp8/gb1NTU1NTV5NTW5NTY5NWU1NbqtNjshZTV5ZTWRiGRliGT9iGWJiPxliP4FiYmJin59in9lmv8Rmv89m1dhm4OJm6v9q09ZttrZuTU1uTW5uTY5ubo5ubqtuq+RxcXFxcYtxcaNxi7txo9Jxurtz3N+BPxmBPz+BP2KBvZ+Bvb2BvdmLcXGLcYuLcaOLu7uLu+iOTU2OTW6OTY6Obk2OyP+QysSQys+Q4NiQ9P+d5P+fYhmfYj+fvYGf2dmi//+jcXGjcYujo6Oj0v+rbk2rbm6rbo6ryKur5OSr5P+21cS29OK2//W2//+7i3G7o3G7u4u76P+9gT+92b292dnIjk3I///So3HS6LvS/+jS///Zn2LZvYHZ2Z/Z2b3Z2dnb4M/b//Xb///kq2nkq27k/8jk///ou4vo///r6+vyq6b1jof3gXn4dm34dof4dqD4d274eG/4eXD4e3L4fHP4g3v4j4f4j7n4ptH5dm35dof5dqD5j7n5kov5vej7dm37dof7pqD7tK/7vbn71P/8j238j4f8pm38vaD86bn86f/8/+j8///+vYf+/+j+////yHn/yI7/0qP/1KD/5I7/5Kv/6Lv/6bn/6tj/9OL//8j//9H//9L//+T//+j//+z///X///8f8i6fAAAACXBIWXMAAA7DAAAOwwHHb6hkAAAgAElEQVR4nO2djYMeRV7neyLLbgggMzurJ3verRlB72T3vAsqz7DnZRaSgCe4wp1B19xxaHZdiRIlR4iSl4lrNMybvCQR3HWCjmBcZOQSTAiEDPQ/dlXVVd1VXVXd1d1V3f308/1C5nmqqqu7f12f51cvXV0dxRDUY0VdnwAEFQmAQr0WAIV6LQAK9VoAFOq1ACjUa1UCdHHsNRhLBmPIohk1ADrmGowhAFTRYCwZjCEAVNFgLBmMIQBU0WAsGYwhAFTRYCwZjCEAVNFgLBmMIQBU0WAsGYwhAFTRYCwZjCE9B/TUI7vI3xNfeeHEl6fvfFrEHJmm2uX/cGHKNTXi+DQzgn8Qk6gNJ++b/tEXvB6PCoC2A+jikZ3sz8mvPrZ4hJXjEQ7m8QClGqpcuREnfvLpxSN3LfIPatKJf/sY+8Hd5fd4iwC0NUCJ31k89ehj9OPk16jb+ff/iQFKizeAwljCjWBff/Jp/nGcUnlgF7WKR/pUO4Ae2MVsC6qeA0rLlVwD4UFPPfqrrL4M4XSowljCjaBf+XnzD2IW++n5/7W1A+jxnfT/sOo5oLR6pDUkb6kd2Zk06AI50FDlyo0gzc47Hss+SON0J2uqjC2gJ3/+hf8VpiAy9R3QE1/5v4+yxtri8TufJu4mATRMCzRYuSZGUHEW2cfJ+3Ym1f/YAnrq0f/+84Fr+N4DeupX/jcpQu5nku47KdYDgSqWQJYkRjAd2CU+TnyZ1QXj3AZdPPKfQ9fwvQc0uQbcgy7yMRve4/CvUJYwI/ivjH8kfLJqfnx78bRcAqv3gCbX4Pj0tGi37QrXBA1WrokRRxIjkg8xmDvW46CnfsW778+r94C2qsFY0pIhJ34q8AEAqKrBWNKOIUfuCF7DA1BFg7FkMIYAUEWDsWQwhgBQRYOxZDCGeAV0KZP8Pa+6aUF2qqYZLBlTDcaQEm4nFdAqZvdRS7nP8RUAVULCEp+XuAsBUJMCswRA3QVATQrMEgB1FwA1KTBLANRdANSkwCwBUHcBUJOa8xJFkRfQ6qallvi8xF0IgJrUnJdo36iAUADqLABqUmNeohEA9SMAalJjXiigBYQCUGcBUJMa8wJAfQmAmtSUl2gEQD0JgJrUlBcA6k0A1KSmvCSA2gkFoM4CoCEU7WPqwatvmpTr2YWFhW88X7zNsYWFh19Ovn7yzMLCQy/F8dZhHiel1ZcPQCsaQg14IlYNouH4yp4GJ9EnD0oc6Ph70K3DtMDOLhws2ujswy9vHU6K7ZNnyOcxGib5yKec1kDNAa1qSHxsDzHmidQgEb6y8Lu//swTtU8DgKohYUnt63kscShni5zgJ8+QUr9CvQz5oD7q2q89T/5nn3JaAzUHtKohzACytWIQy32skTUAVAkJS+peTlZkXLSOI97k2jf/eOGhP6F//vRw4klY2clbSoBqafXUGNB6hgicWQIPX3n4j5pUCD0E1EroGAAqSiamxbqH/bv2OC3cx6VCYj5HLlepitfS6qkxoLUMSb9y98vCxw5e+2YDFwpAlZCwpO7llMqClR75c+3xg7RcJeR4uaYNs7OsK5L0N/JpNdUc0OqGEEfLHWhiUBZuov4ASvkcf0Azx3OFlo5UeWcb5RwP64jQvsXW4Yde6qEHdTZEtEeznlXzxjQAVUPCkrqXU5TWJ7/zvL1c1abbMeZuWFH2sA1awRCR61g2NtXcEACqhoQlta8n7yacJb6QlhOtGbVyVXrqZ3lvngPam158VUNSb3o2F24oAKqEhCW1r2c2fJj2LbRyTTpFSWdDJGTDh70bB3UzZOvwQdYaEBuIcO0T4OojoDZCxwFQ1tlZEJ0ENjqTluvW4SeybfYkYXq7hugguwEj7iTtkbetJR93kqoZIm6FpQalt8aaCYAqIWFJ4+vasXAv3qRGvDA+AagnAVCTGvECQH0KgJrUiBcA6lMA1KRGvABQnwKgJjXiBYD6FAA1qREvMqAWQgGoswCoSY14AaA+BUBNasJLwicA9aTJA/TjJ+d+9i/lb/zj6oNzc/v5Nk14AaBeNXGA3vz2/vjMf5C+8Y+P/8ez8dWvP5ts1IQXAOpVEwfox//zxfjqf30x+8Y/LlNoj3IX2oQXAOpVEwfo1f/2l8xbpt+yCP7xxS9+scl58EeO9/XjyeOxL9eJA/Tyzwoe+bcs4ua3d/ONmjg01YOaXSg8qLMmDlC7B/34ScEnAO2PJg5QWxuU9OL3p/tqwAvnE4B60sQBSutx0YvfnfTi2YfMZwGgkby2NwANr4kDlA97Up+pjIOemaMq6cVH0TJRiigADa/JA9RFlnJP+MwIBaDhBUBNspQ75zMlFICGFwA1yVzuKZ+EUCsvANSvAKhJxnKPJEATQg28CD5TQI2EAlBnAVCTjOUu85lU8gA0vACoSaZyVxxo4kIBaHgBUJNM5a7yyQgFoOEFQE0ylHsEQDsRADXJUO55PimhOi8pnwDUkwCoSYZyB6DdCICapJe7zichFICGFwA1SSt3E5/LhlfCA1DfGiSgJ++78+kWAF12AtREKAB11gABPTKd4RkYUI09AOpbQwP01CPTO/1X8WY+lzfy7GV8DgrQS2trb7xfEHnjrbW1V95jXz/8/rvxB2tMb/s4dBhAjQYRM96kHx8wUzbXLvo8YpwAevK+Ox4L0QadbEA333h/65037ZGsYC+xEt9656/eTdIvGQiooxCAGg1ivzP6o2KAbr3z9/wn50168zM8oPlW6CABvfHW28KtmCM/oFBS10mK/q+/nwD6gQC1qQIAajSIxf/D377PUz545Yd/46cKSJX1kKbvagpoTtGGTbm9qo8c9+HJYw/lytAjhbr1zkU9Uo348Ac/TAA1Oah6CgCo0aCYRV26yAG99Ma/eDOBS4Ly+LTfXrzFgRIPmnOhg/SgrMBkFo2RtErfeuftxJH6c6AhADUaFLOoD3/wHku+8dbFeNNzHR9wHNQVUInP4QF6sTBykxK5+Sav6eNL3rxPOEC1ThBldvMiS6b/PvRcx4cD1MYnBVQh1AyogdBxBLTQg27S7gV1PwmgBvdUV+160PjG371Lk+kPzF8zJZFogE7vPDIt9eVFMgCtq3xzc3Ntbe2iGnmJ1eib6fCSoQdSVwHboPl4FrX5Jjl5Om62lg6deRIbBX2UkHlg5+KJr7zQFqAyocMEtLQXL7fWeGfe0xhT3HIvnsRv/eM/vfJeYpDnOp450K+RztGRncmnL0CtfE4IoLT/o1d3UiRvd0rf/TVBg4yDGg0STvWDtVf+OUn0XMcH86BlgKb8yXwOCVB644W1yS6aIzelO0cM0Pz4TROFupOkGyRq/UvpEOimt7EIqrQNuuuA3zZoCaDLwwe0Sw3tXrz/XrydTwGoANAGqE4oAHUWADWpEqDLADSghgaoNl1EJIcENNL5BKCeNDhAv/qrjyjTRURyQECXAWg4DQ/Qx9QZTSK5LqAFfGaARgA0lIYFKO3EM/mbLOICKHOhKp8A1JOGBWjiQb22QZ0ApYQC0CAaGqC+e/HRhhugRAA0hACoSZUBXc7zqQCqEQpAnTVMQP3diy8HNEo0BUCDaFiAkk4S6x61CGgUzTNNTQHQEBoWoAmjxbOZbG87jvnrk6gyPpdLABV8EkIBaAgNDtBFunLDf7EDanvbcRxfnrtXA3S5FND5eTOhANSPhgjo4uIB+zio9U1zR+/5ru5BywCV+MxV8gDUj4YJaEEvvuBtx7yKl992bH3eWDx2vFfS1JTpqeNunzwe+3KdOEAL3nZsaIOWeFDZgeYqeXhQP5o4QMs9aFwbUJlQBdA8oQDUWRMHqLUN6gNQiVAA6kcTB6jtbcdxDUA1PqWeEgD1o4kD1Pa249gPoCmhANSPJg9QFzUAVBAKQP0IgJrkBmi01wQoJxSA+hEANakRoAmhANSPAKhJToBG8xZAWWcegPoRADWpKaCEUBXQHKEA1FkA1KTGgGqz7wBoTQFQk5oDmicUgNYUADXJBdBovhDQvSqhALSmAKhJPgBVfSgArSkAapIXQBVCAWhNAVCTHACN5ksBtRMKQJ0FQE3yBKhMKACtJwBqki9A54cC6Ke/8C05eGjbts99j6fcv23bLc/F8Udf2kYjr29jesDPYeNQgObs4ZH330o/rlNz4tPb7vZ6xJ4CmhE63oAe+hG5QE9/7nufPcUKMynUQ4TW64LYOAn7UhhAVXu4yG+N/rAYoJ899YuMU49qF9Bo3g3QlNBxBpSUnFygn97/gPAz8XWa8NGPfSs+fWuaft1U+nUVAtCcPVn0L/3E97hl12/5gy/5qwaY+gro1PgDev1WiiDxKkmtxwKMUi4acSitEYVz9aMQgObsESImUSsYoIc+92dezYh7C6iR0DEDlDMpxEpQBpRU6Z/e/2+StqhnBxqoilfsESImffTjzzHzPr3/7vi05zreJ6CpNjbYwkvFjxuXaKryo8fsmHVOV88UENDU/ZwmRH70JRKkxUtw9ep52gU0Pn03M4/++8hzHR/Gg7KlbSJtkdBI9ZJFHlQ0Q909KFspL9LWbCz3oNGoCw96Ou2zszjZtXpQy4CS7j01j/7I/DZVAgEaJZOSNUIrAZoQ6gwoX8nRRGgJ2KN2AFXboFKHWO49+VLLgJLOHjGAjp1tE00WXwoCqACtIaBTlQA1T3J2ytcKoAqHvKWWeFU6unja4xhT3D6gn/3mb93yXGKU5zo+KKA5QiMdwiJANUKLQMtWwq32hrqoNUBpp0jUfyLhs6cotJRNv03Q1gGNr2+75Q8T4zzX8WEBVQmtCui8O6DSUs16JV8KdlBAs2GZQ9u23ZqET4s7R7RWpHzmx26aKiCghmEm+nEoHQI97XU8IjSgEqFRZUApoY6AFr3kszRfKEC7E+7Fm2QAVHahkRnCIkAJoU6ARoVvXwCgY6zggEbNAJUJ9Q8ozwdA+6vQgGYuNLJBWAQoIdQB0Kh43UZ7PgDaewUHNCW0HqDzQQEdAdC+KzygnNCoAMIiQCVCbaDRnnjRig+l+QBof9UGoJH8Wo/KgM7XANRtFhQAHQO1AChFVF7RrjKggjYLaGwoswagWT4A2l+1Amg5hIVpEUfUDFpkAtTlFikAHQeNBaD81fJG0Pg9JA3Q0vFTKR8A7a/GAVBBqBnQkRHQ0gH+CICOhcYEUEaoCbRoNJUoD2jZAD8Hm+UFoP3VWADKRqqiSAONvS+ZZ9QojQp7/xFnk2UHoP3VmACaECr3fCic0ugVf6BehrSo9x8JNvcC0H7LFVDb246z+JCAJoRuiLfMMziXldFV6Wm7lFFBaB7QzO8C0N7LEVDb246z+DgooIzQ/KOittH/tLY3DE8ldOfyAdD+yhFQ25vmsvg4LKB0MHRDpVN5nY0+DYpRGkmdK+55DfkAaH/lCKjtXZ1ZvPy24zCKVFXP4Zxv/Mt14gC1ve04i49juSYNscbC+C3c0J0mDtByDxoD0B5p4gCt1gYFoF1r4gC1ve04i48BaI80cYBa33ZsHAcFoF1r8gB1UWCWAKi7AOiwVfQzGQ8NxpCSn9iEAgqNiwAo1GsBUKjXAqBQrwVAoV4LgEK91qSOg7rltyWEz1C2J7Mh4ygM1CuhwQFapfx6qUqA0vnzk3Gr0y0/AA2vSoCemdvv9MgHAA2dAYByKYBe/eXf2D/E6XYzMzMiFGuWFOUHoOFVAdCb3/l94i+7e+QjlGb37ds3q0a1zRsAtaoCoGd20wp9eI98zIxGI+5Chakl+W3PM5ceEIBWljugxFneLPCg8eQAGgHQ9uQO6Jk5qt1ogy7RpaIKdwxA/alSL556UD+PfGRMOBaIy06bp8W6JYb8bB2eoh0DUH+qDKiXcVCpVnUsEIedekhzumTsNeNjcg94wgAtkTsTfQe0MH+yLFTRjuFB/QmAKiHdEj0/AG1T3QA61m1Q/lqdgh0DUH/qCNA6aT0BlL+YDIC2IwCqhHRLtG0mANCzCwsL33i+eJtjCwsPv5x83TqcfP/kmYWFh17KwvGVPXHub3UBUCWkW6JtM3hAtw5Tus4uHCza6OzDL28d3pNtf+zhlz95hoSP0fgkfGXhd3/9mSfkvzVOBoCqId0SbZvBA3os8YxnhYM06ZNnCL5XqLuM42u/9jz7c+UbyacIkz2xDeS/1QVAlZBuibZN+nLcgQLK2OOilTVxi9e++ccLD/0J/fOnhxM3yPjjW2ZAxiqgVx7+I5JZ/ltDAFQJ6ZZo2wwdUIFaTPncw/5de5xS+rhEGHOeHFBRpbMEqYqPjx289s2XlL81BECVkG5JfhvB53ABzUBiGJI/1x4/SAGVGqUcUN6qzDpMZ1nfSupANRYAVUK6Jflthg9o5kGvUMyUVmWaInlQ2jnaOsyamKxnJYU9yCegw1EBDIMHVLRBP/md5+2Aym1QBmvSKWL+Mwv7EDyoEtItyW8zeEBF9/3sQy+xfjmt4jVA5V58CuTZXNiLAKgS0i3Jb5MCSggdJqDZOGjaSdIATTpDSa9JjH+KDUS4xqENAqBKSLckv83wAWWdnOROkhhmSgHdOvxEts0eHqZ3kAiP9P4T0UER9iMAqoR0S/LbTAKgfRIAVUK6JbltMj4BaCsCoEpIt2QJgHYqAKqEdEuWAGinAqBKqFTsgSSuMRgkBqCyArPUNw+6HMGDhhcAVUK6JUsAtFMBUCWkW7IEQDsVAFVCuiVLALRTAVAlpFuyBEA7FQBVQrol6jYyn2KFpgoHBKCVVQHQy3Nz97444UuAA9C25Q4oXcROW/t70pYAB6Btq1oVr627GGD5RduiIwC0wp5SQ0LzE1zVACXOMvQS4IYFuduXFQYA2raqAHr1wXueDb4EuHVdsR560A0LoQDUn6p5UM11+l8CHID62FNqSGh+gqsaoPHR/WiDAtA25Q4or839LAFeJ60HgKp8AtAWVMGDnpmbI23QiR4HBaCtq2IVXyiXC9sgrYeAWvrxANSfAKgS0i1ZAqCdCoAqId2SJQDaqQCoEtItWQKgnQqAKqESyU8kjcVjSYMC9OR9dz4NQPOWLBV6ULMLhQf1pxTPI9MZngDUsg0AbV0Jj6cemd7ZcRWf3ECKe30nKccnAG1BSd1+x2Ndt0HpLfjtMzP9vhcPQNuX3vzsDNAdO0aj2XED1EgoAPWnrIc0fRcANViyBEA7lQTl8emGvfhGmp29LZmqPDvb+XzlKoCaCAWg/tTJOKilHzRD26CFGUOnGSxZAqBCl9bW3nhfi73x1pv044NX3iN/N9cu+jxi3A2gNWvxzgHN8zlhgG6+8f7WO29q0TfeWns75oBuvfP3jFOP4g1QOsh0XOooiWQAulQGqIHQQQJ64623hZ/Mxf/D377PUz545Yd/87a/Q1KxUdBHk1Gm4z/6AgDNW7IEQBN9+P13GaVb76i1OIm6dJEDeumNfzH42EZiDvRrxHUe2ZV8dtgGFflsyQDUeU+pIX4ooWIEMjeqikR9+IP3WPKNty7Gm57reOFBT953V2setCTN6mB7CqhO6JAB1TpBlNnNiyyZ/vvQcx3PcDz1yPT0XUempftJIhmALgHQRAUeNL7xd+/S5Etv0n6S3zq+k2Gm4rRJAzSKrMvk9QlQ0QbNx7OozTcJoKQ/T+W3ju8hoOPWBtUJrYJVFJHfY+R7jZLUED+UUNl78SR+6x//6ZX3kuan5zo+1DCTvR9Um6WuAdX49AEo43O0z0ZojwAlXXTLOCgbBl175Z+TRM91fKBhpln7SBIAlcX4HO2z+dA+AUrvJLFGpjbMxBLTIdDNv3rX40EDDTNNFqB5Qt2xSvgkgI7GANBOFGiYacwBNUp7IKn5o0lRtC9VkHk5wwDUcZjp6oNzc/tdVxaZqDZobQ/KHSj1oGYXCg/q3ouni9hd/fqzk7vCcgGgOUJdsRJ8MkCNhAJQd0AvUw5bWN3Of8a+AhoB0HIlo0xsMv2R8jtJBeuD+lphuRcyFbrOpwSoSqgroCMFUBOhAJQB+tV/t9NpmIkuthh6heUAGf14UO+ARgDUQXyY6cBdYripANCPn9wdW9eojwFo+QFVQEc5QA2EAlAxDnqEeM8SD3r1QdKHjye2DVoMqEIoAPWndKD+xJdLhpkSPuOGKyyvrKwA0GR/Iw1QnVAA6t6LPzNHtb/ZCssrpCjXbRe9qEDKEgGoEp8a0gJCYeUOaLkcrt/4AmrgUwFUJtQFK5lPAGrXYjLONE3VwkNzAFTICKhGKAClNJ56ZNei0zBTiVwu7Ni2QT0DGgFQN6WdJIdhpjK5XNgGaT0HVCLUBdCREdA8oQC0LQ9KPGfJtWXTSwCo46lPFKCiDRrwoTna9lyxpCVKnkQaZ0AzQsuxUvkEoHa11Isfe0BNfIYAdFRvXlQ+PjXEDyUdCoAqId2SpRCARgWA1pl2osWnhvihpEO1NQ467m1Qz4COrICOAKiitgD1kNZ7QFNCAag/AVAlZFXBA0nVH02SnkQyyOfDSQB0mNIgNjrQ2h4070AVDzqqPi9Kj08N6fIqehE8qBLSLVmqAKggtASrfBcpD2jFm6am+NQQP5R0qHYAlbpIAFR3oCqgIwAqqRVA5UGmgIA2X9PJYMkSAO1UAwLUw6p4BkuWqgDKCS3GSuczB+io0k1TY3xqiB9KOlQIQLUZS2MPqJnPeoDqLVAAWqAAgEpzPkXbs5U26LgAqvOZB3RU4aapOT41xA8lHSoooKrnLL3oJWkdtkEBaGcaEqDN03KWiFgLnwZAE0KLsDLxqQE6cr4nZYlPDfFDSYcK2gYFoPrRAGg1he3FK23P/LVVEnlg8IAa+dQBHbkNWFnjU0P8UML16S98yxB5/6304/otz5G/p7fd7fWIXdxJWlnnHSfZvYpALwG18WkClBE6VEAP/YgR0G0PxBzQz576RcapR7UO6Aop1pXkywQCaubTAOjIZUTVHp8a4ocSJkKiGdBf+onvcUCv3/IHX3rA4yHjdgCV6/KVc6vjBmhk4rAeoKYx0LEB9PqtH/3Yt6iXVGvxT+9/4NDdHNBDn/uzp271eMi4FUBlEleWV1cuLBsGR3vcBvUJqJlPE6Cj0u5WbtdRJB06NcQPJVwM0LwIoB/9+HMM0E/vvzs+7bmOrwQoWyas8tI3KqDLq+cNHSfrdXdNDAdoZOTQCigl1HZAmwM1A1rSms3tmb9uqRNA49N3M0Dpv4881/FVAL08d++LcfUlwHOAjtvKIv4AjSITiDZAGaGOgKbkdwQo6d5TOA/dSlsAfuv4CoAevee7xIPWWH4xq8tXVs6N28oikYVDO6BC2rEiM4g2QEfOgGaeuSNA49O3EkBJL4rKbx1fuYqvvgT4+vq6+LaxsbFu2Sq3abeSy74ioLSyTZaczzMa2UC0xkdugEoth64A/ew3f+uW55Lmp+c6vjKglZcAl2r45KvDEFTxCH9ZgdVP06+P07NI0lNJ0d69U9nTRZF0/YofRDI/neTUR5VftpRPawvQ+Pq2W/4wqdw91/HePGicB5RV50v1APV7j7RBFU8daAUPGkXzRFPSQiHCjfJ3clbzoCOX1yArPa8WPKhhmIl+HEqHQE+bRktrqzKgrm1QOqC0SilT+kgU2djoHlly/wC1NjVNCQmfMqCcUQFRVUAtL0iUz1sdGZjwe/EURbclwNdXzglAeXWdUbluoI+nitug51ZXewFoZG1qmhI4n/NTUzbeqgNa+p5udeQKgLqNg65sLK+uCkCTmIxKA6BpasyDq6vnmoBWNy3OWWKpyY2ACjwpoRkxU1MyrpUBLX1Pd25kdcIBLVF2+Qigy+d4G5THVAPUVMMHAlRucOQtqQRoyuf8XsEkoZM61BTR6oCWvKc7P/IPQIuUXT4KqEqYxFy+DUqCHQKqHCtvSQVAJT4JoFMJnvO5Or8GoIXv6dZuTQHQIknXb10wuKJ9yfPCCBGpcX5jZ9DqpnkCVOZzfi/1mimeEqF1AC14DbJ+6xSAFsnAhMkXmgB1YanPgCp8EkDz4oTWAtT+lln91j4ALZKBif4D6qUNqvJpAHS+CaC2l3gapp4A0CIZmHAAVCWkgCVrIt1Bp734HJ8mQBNCawJq6CnF5rlRALRIpnI3tCZ9TxZhP4IuAc3zaQSUEVoXUJ3Q2Dx3D4AWqRYT7ml9BVTj0wwoJbQ2oBqhsXluKQAtkqnch+9BdT5tgE41ADRHqG3qMwAtkqHcXdqgrmm9bINGBj4tgM43AlRB1Dr1GYAWyVDurQDqLy1vSSmgRj5tgOZmkVQFdJTNjLJOfQagFVU6RbmfcgTUjKcd0HnbLBI3QEd8alRBDgBaJJNjaqEN6jEtb0khoJGNTzugey2EOgNalgBAi1TGhMOjxWMDKPVkVhDtgFqm4gFQq1oE1GVxhnEANJmBXARiAaDz6vw7AFomAKqEcopMan7Rjbv1Iq1Imp9sxwKgSki3pCi/LSF8hrI9pYb4oaRDoQ2qhHRLivID0PBqE9CGaQDUfU+pIX4o6VAAVAnplhTlB6DhBUCVkG5JUX4AGl4+AYV6JxvfY6RiAwEo1GsBUKjXAqBQrwVAoV4LgEK9FgCFei2MgxblH4Nx0OLNzdG9isVAvRICoH2LBaBKCID2LRaAKiEA2rfYyoCKBb/dX+TldkblaQDUfU9V/Eq/VRVQ9jIvorIXec3MzNiv7czMdi15Zvt2Ekn2sX375y15y0CzHdM9X6xbUpRfS+B7iuWAnoEnJB/sb7z985/XNqYpjocWh5qZmTUbMjEeNHmZF1HJSxRmR6ORjdB4ZrRjZkcueWYHIXTHaHZp+8z2HV8w5y0BbcZ2TPd8DQEVe4rlgJaBJyQfyd/btu/Y8YUZw87cDi0ORT73zRgNmRhA0yq+5EVes/v27Zs1umyWePvs7bnk2dtnb7uNRt42e9vtX7DnLVDhMQPkK9mTdbc8IflI/hLTb//CrHGzKsfVs4hilh5b6gF0VWLrAlryIi940H550I3cM6mFlvUq1psHjTMPIwoAAAxeSURBVNEG7XEb1PDktN2yXsXWBbTKy2Sdzqg8Db149z2VACoY7RWK5ti6gJa8yAuAhs3QHFDJj7rte5wAZa9ExDjouAO6vLxhRHS8AS1Q6VGbpQFQ9z25AsrcqNu+AWhZGgB135M7oAZEAWi9NADqvqcqgGqIAtB6aQDUfU/VAM0hCkDrpQFQ9z1VBVRBFIDWSwOg7nuqDihFtHDfALQsDYC676kOoKkTBaD10gCo+55qASqcKACtlwZA3fdUE9AE0cECCvVWG87yscS5T8GDKiHdkqL8A/Sgy1JnyeWIY+VBS4/aLA2Auu+pCaAWQgFoWRoAdd9TI0A3jIQC0LI0AOq+p2aAGp0oAC1LA6Due2oKqIHQNgCVXvgkogCoEgKgy53McRJcpq/MA6DGNAAqxeYIDQVojkwAWpQGQOXY8JPwjGwCUHsaAFViFUJ9AyrgNL8WF4Aa0wBoLlZC1CugkucEoAC0PqDLQWaJKvU6AAWgDQD1P0s03+r0C2j6lPGZOar97PNeLNzQdob2AE0J9QKooU/kFVBltUW2PtPR/fCg7gccR0CX/U1jNnbZvQKqrHRD12S6+Z1nAaj7AccSUI5oY0AtA0peAVXWCqOulFT5tKKP88svQv2QH0A9TGOmztOMoldA5dUW2efVr0tetPS8m6XBg7rvyTOgyw0XGisa8QzmQS+nazKJdqjLhW2QBkDd95T3pO4z6gNMtCd47quqNHP9NujR3SIWgLoecGw9aIN59mVD8p578elqi0nFTt3ozd/DMFPbGdoHtOY8e7nj3gKgfByULb+Y1PRn5ubueVYvVgAaNkMHgNaZZ6923NsAtFAuF7ZBGgB131MIQIkTdT2PJDY/rgRAG6cB0OLYKvPs9VF5ANo4DYCWxGqE2gA13TQCoI3TAGhZrOODIMa7RgC0cRoALY11eRCk0k1NAApAfQJa/iBIxZuaABSAegW05EEQ1vgEoIHSAKhLbNFy4UntDkADpQFQp1jrk0qi8dlTQKHeKQyg0pB9rOBZ5647PCg8qH9ADQ+C1L3rDkABaABAtQdBlKElABooDYC6xyrr2Uf1p4UAUAAaBFD5SaUm00IA6CQDKtR4Rn3RLPsaE+ZDzagHoE4J/QFURIfwoOJJpYbTQuBBAWgoQAmhzaeFAFAAGgzQZQ/TQgAoAA3oQaemAGjQnQLQ+rFRND+/d8qEKAANlAZAK8RSPuf3zs8bCAWggdIAqHMsw5MBaiC0O0DT5RfFuotZBABtMUPXgEacTwaoTmgQQA/c+XQpoNLyi8lyIsp6jC4XtkEaAHXfU2BABZ4cUI1Qr4Ce/NrTi6cemZ7e5eBBs6Vv+IphynqMLhe2QRoAdd9TUEAzPAWgeUL9etDj09N3POZWxWeLh/F1F7MILL/YR4UAVOZTAJoj1HsVf+LLOUaFgdblF/m6i/J6jPCg7WXozoMqeGaAqoSGaIOeesShDaosYEvboUqEy4VtkAZA3fcUDNAcnxmgCqGd9eKVJicFFG3QSgccd0DzeMqAyoh2Bmi2/CJfd1FajxGAtpihE0AjnU8F0IzQrsdBqc/k6y5iHLTKAccaUAOeOUBTQnEnKVAaALXGGvHMAyoIBaCB0gYHqJCH2fN7nTQ1hRn1AdMGB6iIbuhB2bwlFw9KnSg8aLg0AGqMFfOWnAClhALQQGkA1BArzVtyApQ0RAFooDQAqsWmnSN3QE0zRAGolzQAmo/Nz1tyAtRCKABtnAZA1VjDvCUnQPcaEQWgjdMAqBwbGectuQHa9EGQIIBCvVMTQG3zlhxjmz0IAg9qTDNYUpR/yB5Uu3NUFdBmD4IAUGMaAOWxZdNC3GIbPAgCQI1pADSJNd14rwFog3n2ANSYBkCNtXttQOvPswegxjQASvGshaItVkIUgDZOA6B0aMkroDXn2QNQY9qkAxpVmxbiFltrnj0ANaZNOKCVp4U4xtaYxgxAjWkTDWidaSGOsQmhALRx2uAAFfI3Zb6eKk+0T88cgCqhoQEqoss8aFR/WohjLHGi7a5ud/VBuvSNWOQOgLabwS+gueeJgwA6b1zp1jeg2WJ2dDkRuvxNssgdAG05g09AtcfdwwBabZZoTUCzhUQuU0yP7ueL3AHQljP4A9SwGkMoQKssF14TUHVtJvKNL3IXY3W7fqoMUNNiIeEArTBLtCagymJ2dNkbvsidejWKfvkN0uBB3ffkBqgRz6CAGlqiwTzox0/u5rGiHepyYRukAVD3PbkAGnm+6+4Y67Yac+M2KOnFp90jAOp6wB4BGlVZjMFvrMskvNq9eLGYHeeTL3IHQFvO0BTQUDc13WKnytcSrQlotrodHf+k3SO+yB0AbTdDI0CjgDc1HWOnyuY41QW0UC4XtkEaAHXfUwGgcs+oM0BL5zgBUGPa8AFt9Cix39jCOU4A1Jg2cEBbu2fkOsfJvhIeADWmDRrQNu8ZucZap5AAUGPacAGN2r5n5BprmUICQI1pgwXUbQHvbmKNiAJQY9pgATWz0Q9AjV4UgBrTBgeoUMjZ8j40lZ9yn545AFVCQwNURPfbg1LlZpHAgxrTAGiXsTKjQQCFeqexAlRGFB7UmGawpCg/PKj32CnOKAA1pgHQHsQyRgGoMQ2A9iN2agqAGtMAaF9iAagxDYD2JRaAGtMAaF9iAagxDYD2JRaAGtMAaF9iAagxDYD2JRaAGtMAaF9iAagxDYD2JbYuoNnyi/xbFgFAW8wAQM2AZssv8m9ZhHQ1VlZW1sm/lXPkv1fPkb/83woLv7pOvvHNxOZLJJ0GSL4kKgk6FgrdQX1AxWkYypUnrdOP5CxfJee+trb2KtW5lXiJmUVsFOec5Mjlzw4BQF1jawKaLX3Dv0lr4WTFury8emF5dXV15bWVtdVz59ZI0b1GSu81ErO2+urq2srq8grbbHkl2Xz53OrKyiop3uWNJCoJOhYK21FtQMVpGMqVJ61skI/kLMl/r629usb02rlV+lM799prq+T3l5zzuSSHmn8pOwQAdY2tCWi2eBj/lkVkyy+ub2xcuED+v7D++vrahfPn19bPn3/9/Pn110nM2oVXL6ytX9hYZ5vRD/Z5/sL6+oX1LCoJOkrkqqeC3DyJfSRnSf57XQD6Ojnp8+vr519//cL59fPJOZ9XdiZbWP8EJ1zVAM2WX+TflPUYl1LHAQ8q5e+DB7Vsbo7uVaw3DxqjDdrjNuikAOrUBrUftVkaevHue5pUQLPlF/m3LAKAtpkBgJoBzZZfxDhoQQIA9RdbEdBClR61WRoAdd8TAG2g2m8DqZsx2OtHKu+4swyV9lNl4663BaBedwxAfW8LQL3uGID63hYLN0C9FgCFei0ACvVaABTqtQAo1Gv5A5S++ete4w2oYrE7/Woup8wsX92Dejyhqw+y10G7Z7jMTrmSyXTauCHDXxQ9/pBXlsbPmF+74m3VC1y4rfTqN9t+43Reh3OJ+QM0eaGnaSJ+oS5TY9RcTplZvroH9XhCdKrX1a8/656BFpG2ZcmpnyHlrmf4858pevwhpyyNn3H6BtaibdULXLJtnEzStO9XlFqVEvMGKH9nt2kSVJGO3vNdet9fyeWSOclX86A+T+gyvb5H91ezQNuyOMPVX/6N/YZT+tef+z8FU89yytL4GacvWS/aVr3AxdvGCfsF++UX1+2EubwBSpw19e+maaTFoieo5nLLzCe01Duo3xPStizLQLxGhQw3v/P7384bST/+9T/+dsHk3bxVShr5xq9d8bbqBS7dL/WGBfuN0yrevcS8AUorDfLjMU3EL8lITlnN5ZaZcVT3oF5PiE5JrJLh6oP3PFslw5ndtCrUM/y/nxaAOuxFSaNnzK9d8bbqBS7bL/ss2G+cAupeYn578Uf3t+tBax/U5wl9/OTuvEvw6nJJ2k2/HpSdMZO5vZjbT3qBy7a9nHZ4rO3Q7jwoP6/qzcGrtdqgCqA+26CVT+jqg7QwKlpQpdGa9I53e2uD8jPm51GyrXKyZdse3Z1lsRh+tbM2KP313Py9F00T8YtFT1DN5ZZZ1MS1DurvhHhpu2fg1Volk6kH1TP8+c8UPf6g7UKk8TPm1654W/UCF2/LK/aC/cYpoO4l5nUclDSt2h8HrXVQfyckRv/cLTCec4NxUMvjD3mlz0pI45X3WGrX7LkK9WSLt+WVdcF+efvJ7YQT4U4S1GsBUKjXAqBQrwVAoV4LgEK9FgCFei0ACvVaABTqtQAo1Gv9fxsG4x3qJiYxAAAAAElFTkSuQmCC" /><!-- --></p>
-<div class="sourceCode" id="cb60"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb60-1"><a href="#cb60-1" tabindex="-1"></a>glm_lkm_s <span class="ot">&lt;-</span> <span class="fu">glmnet</span>(<span class="at">x =</span> lkm_x_sis, <span class="at">y =</span> lkm_y,</span>
-<span id="cb60-2"><a href="#cb60-2" tabindex="-1"></a>                    <span class="at">family =</span> <span class="st">&quot;binomial&quot;</span>, <span class="at">alpha =</span> <span class="dv">0</span>, <span class="at">lambda =</span> <span class="dv">0</span>)</span>
-<span id="cb60-3"><a href="#cb60-3" tabindex="-1"></a>glm_lkm_s<span class="sc">$</span>a0</span></code></pre></div>
-<pre><code>##        s0 
-## -96.12652</code></pre>
-<div class="sourceCode" id="cb62"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb62-1"><a href="#cb62-1" tabindex="-1"></a>glm_lkm_s<span class="sc">$</span>beta</span></code></pre></div>
-<pre><code>## 2 x 1 sparse Matrix of class &quot;dgCMatrix&quot;
-##               s0
-## V847  0.03460152
-## V3320 0.04338766</code></pre>
-<div class="sourceCode" id="cb64"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb64-1"><a href="#cb64-1" tabindex="-1"></a>leukemia_sis <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(<span class="fu">cbind</span>(lkm_x_sis, <span class="at">y =</span> lkm_y))</span>
-<span id="cb64-2"><a href="#cb64-2" tabindex="-1"></a><span class="fu">summary</span>(<span class="fu">glm</span>(y <span class="sc">~</span> ., <span class="at">data =</span> leukemia_sis, <span class="at">family =</span> <span class="fu">binomial</span>(<span class="at">link =</span> <span class="st">&quot;logit&quot;</span>)))</span></code></pre></div>
+<p>此時，再以 <code>glm</code> 函數只針對兩個重要變數 <code>V3320</code>
+及 <code>V3810</code> 建立 Logistic Regression。</p>
+<div class="sourceCode" id="cb49"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb49-1"><a href="#cb49-1" tabindex="-1"></a>leukemia_sis <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(<span class="fu">cbind</span>(lkm_x_sis, <span class="at">y =</span> lkm_y))</span>
+<span id="cb49-2"><a href="#cb49-2" tabindex="-1"></a><span class="fu">summary</span>(<span class="fu">glm</span>(y <span class="sc">~</span> ., <span class="at">data =</span> leukemia_sis, <span class="at">family =</span> <span class="fu">binomial</span>(<span class="at">link =</span> <span class="st">&quot;logit&quot;</span>)))</span></code></pre></div>
 <pre><code>## 
 ## Call:
 ## glm(formula = y ~ ., family = binomial(link = &quot;logit&quot;), data = leukemia_sis)
@@ -545,6 +599,26 @@ such that error is within 1 standard error of the minimum.</p></li>
 ## 
 ## Number of Fisher Scoring iterations: 25</code></pre>
 </div>
+<div id="參考文獻" class="section level2">
+<h2>參考文獻</h2>
+<ul>
+<li>Fan, J., &amp; Lv , J. (2008). Sure independence screening for
+ultrahigh dimensional feature space. <em>Journal of the Royal
+Statistical Society Series B: Statistical Methodology</em>,
+<strong>70(5)</strong>, 849 - 911.</li>
+<li>Simon, N., Friedman, J., Hastie, T., &amp; Tibshirani , R. (2013). A
+sparse group lasso. <em>Journal of computational and graphical
+statistics</em>, 22(2), 231 - 245.</li>
+<li>Yuan, M. and L. Lin (2006), Model Selection and Estimation in
+Regression with Grouped Variables, <em>Journal of the Royal Statistical
+Society, Series B: Statistical Methodology</em>, <strong>68</strong>, 49
+- 67.</li>
+<li>Zou, H., &amp; Hastie, T. (2005). Regularization and variable
+selection via the elastic net. <em>Journal of the Royal Statistical
+Society Series B: Statistical Methodology</em>, <strong>67(2)</strong>,
+301 - 320.</li>
+</ul>
+</div>
 </div>
 <div id="homework-lasso-tool-comparison" class="section level1">
 <h1>Homework: Lasso Tool Comparison</h1>
@@ -555,7 +629,7 @@ such that error is within 1 standard error of the minimum.</p></li>
 <ol style="list-style-type: decimal">
 <li>使用課堂的信用卡資料。</li>
 </ol>
-<div class="sourceCode" id="cb66"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb66-1"><a href="#cb66-1" tabindex="-1"></a><span class="st">&#39;https://raw.githubusercontent.com/PingYangChen/BDA_Course_R_Code/refs/heads/main/sample_data/Credit.csv&#39;</span></span></code></pre></div>
+<div class="sourceCode" id="cb51"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb51-1"><a href="#cb51-1" tabindex="-1"></a><span class="st">&#39;https://raw.githubusercontent.com/PingYangChen/BDA_Course_R_Code/refs/heads/main/sample_data/Credit.csv&#39;</span></span></code></pre></div>
 <ol start="2" style="list-style-type: decimal">
 <li>使用 R <strong>glmnet</strong> 套件建立 Lasso 迴歸。</li>
 <li>使用 python <strong>scikit-learn</strong> 套件建立 Lasso 迴歸。</li>
@@ -573,37 +647,37 @@ such that error is within 1 standard error of the minimum.</p></li>
 <li>Python 環境設定<a href="https://html-preview.github.io/?url=https://github.com/PingYangChen/DS-pytutorial/blob/main/lecture_note/python_basic.html">參考連結</a></li>
 <li><strong>scikit-learn</strong><a href="https://scikit-learn.org/stable/modules/generated/sklearn.linear_model.LassoCV.html#sklearn.linear_model.LassoCV">文件連結</a></li>
 </ul>
-<div class="sourceCode" id="cb67"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb67-1"><a href="#cb67-1" tabindex="-1"></a><span class="im">import</span> pandas <span class="im">as</span> pd</span>
-<span id="cb67-2"><a href="#cb67-2" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
-<span id="cb67-3"><a href="#cb67-3" tabindex="-1"></a><span class="im">from</span> sklearn.preprocessing <span class="im">import</span> StandardScaler  <span class="co"># 用於進行資料標準化</span></span>
-<span id="cb67-4"><a href="#cb67-4" tabindex="-1"></a><span class="im">from</span> sklearn.linear_model <span class="im">import</span> LassoCV  <span class="co"># 用於進行 Lasso 回歸的交叉驗證</span></span></code></pre></div>
+<div class="sourceCode" id="cb52"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb52-1"><a href="#cb52-1" tabindex="-1"></a><span class="im">import</span> pandas <span class="im">as</span> pd</span>
+<span id="cb52-2"><a href="#cb52-2" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
+<span id="cb52-3"><a href="#cb52-3" tabindex="-1"></a><span class="im">from</span> sklearn.preprocessing <span class="im">import</span> StandardScaler  <span class="co"># 用於進行資料標準化</span></span>
+<span id="cb52-4"><a href="#cb52-4" tabindex="-1"></a><span class="im">from</span> sklearn.linear_model <span class="im">import</span> LassoCV  <span class="co"># 用於進行 Lasso 回歸的交叉驗證</span></span></code></pre></div>
 <p>讀取信用卡資料集，並對其進行資料的預處理，將目標變數設定為
 <code>Balance</code>（信用卡餘額），並轉換所有的分類變數為虛擬變數，以便在後續的模型分析中使用。</p>
-<div class="sourceCode" id="cb68"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb68-1"><a href="#cb68-1" tabindex="-1"></a><span class="co"># 從網路讀取信用卡資料集並載入為 pandas DataFrame</span></span>
-<span id="cb68-2"><a href="#cb68-2" tabindex="-1"></a>creDf <span class="op">=</span> pd.read_csv(<span class="st">&#39;https://raw.githubusercontent.com/PingYangChen/DS-pytutorial/refs/heads/main/sample_data/Credit.csv&#39;</span>)</span>
-<span id="cb68-3"><a href="#cb68-3" tabindex="-1"></a><span class="co"># 將 &#39;Own&#39;, &#39;Student&#39;, &#39;Married&#39; 和 &#39;Region&#39; 這些分類變數轉換為虛擬變數，並刪除第一個類別以避免多重共線性</span></span>
-<span id="cb68-4"><a href="#cb68-4" tabindex="-1"></a>creDfDummy <span class="op">=</span> pd.get_dummies(creDf, columns<span class="op">=</span>[<span class="st">&#39;Own&#39;</span>, <span class="st">&#39;Student&#39;</span>, <span class="st">&#39;Married&#39;</span>, <span class="st">&#39;Region&#39;</span>], drop_first<span class="op">=</span><span class="va">True</span>, dtype<span class="op">=</span><span class="bu">int</span>)</span>
-<span id="cb68-5"><a href="#cb68-5" tabindex="-1"></a><span class="co"># 設定目標變數 y 為 &#39;Balance&#39;（信用卡餘額）</span></span>
-<span id="cb68-6"><a href="#cb68-6" tabindex="-1"></a>y <span class="op">=</span> creDfDummy[<span class="st">&#39;Balance&#39;</span>]</span>
-<span id="cb68-7"><a href="#cb68-7" tabindex="-1"></a><span class="co"># 設定自變數 x ，為所有欄位（不包含 &#39;Balance&#39; 欄位）</span></span>
-<span id="cb68-8"><a href="#cb68-8" tabindex="-1"></a>x <span class="op">=</span> creDfDummy[np.setdiff1d(creDfDummy.columns, <span class="st">&#39;Balance&#39;</span>).tolist()]</span>
-<span id="cb68-9"><a href="#cb68-9" tabindex="-1"></a><span class="bu">print</span>(x.columns)</span></code></pre></div>
+<div class="sourceCode" id="cb53"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb53-1"><a href="#cb53-1" tabindex="-1"></a><span class="co"># 從網路讀取信用卡資料集並載入為 pandas DataFrame</span></span>
+<span id="cb53-2"><a href="#cb53-2" tabindex="-1"></a>creDf <span class="op">=</span> pd.read_csv(<span class="st">&#39;https://raw.githubusercontent.com/PingYangChen/DS-pytutorial/refs/heads/main/sample_data/Credit.csv&#39;</span>)</span>
+<span id="cb53-3"><a href="#cb53-3" tabindex="-1"></a><span class="co"># 將 &#39;Own&#39;, &#39;Student&#39;, &#39;Married&#39; 和 &#39;Region&#39; 這些分類變數轉換為虛擬變數，並刪除第一個類別以避免多重共線性</span></span>
+<span id="cb53-4"><a href="#cb53-4" tabindex="-1"></a>creDfDummy <span class="op">=</span> pd.get_dummies(creDf, columns<span class="op">=</span>[<span class="st">&#39;Own&#39;</span>, <span class="st">&#39;Student&#39;</span>, <span class="st">&#39;Married&#39;</span>, <span class="st">&#39;Region&#39;</span>], drop_first<span class="op">=</span><span class="va">True</span>, dtype<span class="op">=</span><span class="bu">int</span>)</span>
+<span id="cb53-5"><a href="#cb53-5" tabindex="-1"></a><span class="co"># 設定目標變數 y 為 &#39;Balance&#39;（信用卡餘額）</span></span>
+<span id="cb53-6"><a href="#cb53-6" tabindex="-1"></a>y <span class="op">=</span> creDfDummy[<span class="st">&#39;Balance&#39;</span>]</span>
+<span id="cb53-7"><a href="#cb53-7" tabindex="-1"></a><span class="co"># 設定自變數 x ，為所有欄位（不包含 &#39;Balance&#39; 欄位）</span></span>
+<span id="cb53-8"><a href="#cb53-8" tabindex="-1"></a>x <span class="op">=</span> creDfDummy[np.setdiff1d(creDfDummy.columns, <span class="st">&#39;Balance&#39;</span>).tolist()]</span>
+<span id="cb53-9"><a href="#cb53-9" tabindex="-1"></a><span class="bu">print</span>(x.columns)</span></code></pre></div>
 <p>首先對資料進行標準化，這是正規化迴歸的一個前處理步驟。</p>
-<div class="sourceCode" id="cb69"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb69-1"><a href="#cb69-1" tabindex="-1"></a><span class="co"># 對自變數進行標準化，使每個變數的平均值為 0，標準差為 1</span></span>
-<span id="cb69-2"><a href="#cb69-2" tabindex="-1"></a>scaler <span class="op">=</span> StandardScaler()</span>
-<span id="cb69-3"><a href="#cb69-3" tabindex="-1"></a>scaler.fit(x)</span>
-<span id="cb69-4"><a href="#cb69-4" tabindex="-1"></a>x_standard <span class="op">=</span> scaler.transform(x)</span></code></pre></div>
-<div class="sourceCode" id="cb70"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb70-1"><a href="#cb70-1" tabindex="-1"></a><span class="co"># 設定一組 alpha 值，用於進行交叉驗證</span></span>
-<span id="cb70-2"><a href="#cb70-2" tabindex="-1"></a>alpha_vec <span class="op">=</span> <span class="dv">2</span><span class="op">**</span>np.linspace(<span class="op">-</span><span class="dv">5</span>, <span class="dv">5</span>, <span class="dv">100</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb54"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb54-1"><a href="#cb54-1" tabindex="-1"></a><span class="co"># 對自變數進行標準化，使每個變數的平均值為 0，標準差為 1</span></span>
+<span id="cb54-2"><a href="#cb54-2" tabindex="-1"></a>scaler <span class="op">=</span> StandardScaler()</span>
+<span id="cb54-3"><a href="#cb54-3" tabindex="-1"></a>scaler.fit(x)</span>
+<span id="cb54-4"><a href="#cb54-4" tabindex="-1"></a>x_standard <span class="op">=</span> scaler.transform(x)</span></code></pre></div>
+<div class="sourceCode" id="cb55"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb55-1"><a href="#cb55-1" tabindex="-1"></a><span class="co"># 設定一組 alpha 值，用於進行交叉驗證</span></span>
+<span id="cb55-2"><a href="#cb55-2" tabindex="-1"></a>alpha_vec <span class="op">=</span> <span class="dv">2</span><span class="op">**</span>np.linspace(<span class="op">-</span><span class="dv">5</span>, <span class="dv">5</span>, <span class="dv">100</span>)</span></code></pre></div>
 <p>使用 <code>Lasso</code> 回歸進行交叉驗證，選擇最佳的懲罰參數
 <code>alpha</code>，並顯示變數的迴歸係數。</p>
-<div class="sourceCode" id="cb71"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb71-1"><a href="#cb71-1" tabindex="-1"></a><span class="co"># 使用 Lasso 回歸進行交叉驗證，選擇最合適的 alpha 值</span></span>
-<span id="cb71-2"><a href="#cb71-2" tabindex="-1"></a>lasso <span class="op">=</span> LassoCV(alphas<span class="op">=</span>alpha_vec, fit_intercept<span class="op">=</span><span class="va">True</span>, cv<span class="op">=</span><span class="dv">5</span>)</span>
-<span id="cb71-3"><a href="#cb71-3" tabindex="-1"></a>lasso.fit(x_standard, y)</span>
-<span id="cb71-4"><a href="#cb71-4" tabindex="-1"></a>lasso.intercept_ <span class="co"># 模型的截距項</span></span>
-<span id="cb71-5"><a href="#cb71-5" tabindex="-1"></a><span class="co"># 將 Lasso 模型的迴歸係數轉換為 pandas DataFrame 格式並顯示</span></span>
-<span id="cb71-6"><a href="#cb71-6" tabindex="-1"></a>lasso_coef <span class="op">=</span> pd.DataFrame({<span class="st">&#39;var&#39;</span>: x.columns, <span class="st">&#39;coef&#39;</span>: lasso.coef_})</span>
-<span id="cb71-7"><a href="#cb71-7" tabindex="-1"></a><span class="bu">print</span>(lasso_coef)</span></code></pre></div>
+<div class="sourceCode" id="cb56"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb56-1"><a href="#cb56-1" tabindex="-1"></a><span class="co"># 使用 Lasso 回歸進行交叉驗證，選擇最合適的 alpha 值</span></span>
+<span id="cb56-2"><a href="#cb56-2" tabindex="-1"></a>lasso <span class="op">=</span> LassoCV(alphas<span class="op">=</span>alpha_vec, fit_intercept<span class="op">=</span><span class="va">True</span>, cv<span class="op">=</span><span class="dv">5</span>)</span>
+<span id="cb56-3"><a href="#cb56-3" tabindex="-1"></a>lasso.fit(x_standard, y)</span>
+<span id="cb56-4"><a href="#cb56-4" tabindex="-1"></a>lasso.intercept_ <span class="co"># 模型的截距項</span></span>
+<span id="cb56-5"><a href="#cb56-5" tabindex="-1"></a><span class="co"># 將 Lasso 模型的迴歸係數轉換為 pandas DataFrame 格式並顯示</span></span>
+<span id="cb56-6"><a href="#cb56-6" tabindex="-1"></a>lasso_coef <span class="op">=</span> pd.DataFrame({<span class="st">&#39;var&#39;</span>: x.columns, <span class="st">&#39;coef&#39;</span>: lasso.coef_})</span>
+<span id="cb56-7"><a href="#cb56-7" tabindex="-1"></a><span class="bu">print</span>(lasso_coef)</span></code></pre></div>
 </div>
 </div>
 </div>

@@ -117,15 +117,33 @@ colnames(modelmat)
 head(modelmat, 4)
 ```
 
-- `lambda`: the values of `lambda` used in the fits.
-- `cvm`: The mean cross-validated error - a vector of length `length(lambda)`.
+`glmnet` 及 `cv.glmnet` 函數使用方法
 
-- `lambda.min`: value of `lambda` that gives minimum `cvm`.
-- `lambda.1se`: largest value of `lambda` such that error is within 1 standard error of the minimum.
+- `alpha`: 控制 L1-penalty、L2-penalty 的分配比例，數值範圍為 [0, 1]。
+  - `alpha = 0`，為 Ridge regression。
+  - `alpha = 1`，為 Lasso regression。
+  - `alpha` 介於 (0, 1) 之間，為 Elastic net regression，`alpha` 越大，L1-penalty 越重。
+- `lambda`: 控制 L1-penalty、L2-penalty 的逞罰程度，`lambda` 越大，逞罰程度越重。
+  - 一般而言，`lambda` 值可為一個由很小的值指數成長到一個大於 1 的值，例如 `exp(seq(-5, 1, length = 100))`。
+- `standardize`: 是否對 `x` 進行標準化，基於解釋變數之間可能數值範圍、單位不同，預設為 `TRUE`。
+- `intercept`: 是否配適截距項，預設為 `TRUE`。
+
+
+給定一組 `lambda` 向量，可透過 `cv.glmnet` 函數進行交叉驗證選擇合適的 `lambda` 值，其關鍵輸出如下
+
+- `lambda`: 使用者所輸入的 L1-penalty、L2-penalty 的逞罰程度向量。
+- `cvm`: 交叉驗證的平均誤差，長度為 `length(lambda)`，分別對應每個 `lambda` 的驗證結果。
+- `lambda.min`: 使 `cvm` 最小的 `lambda` 值，通常數值較小，逞罰效果較弱。
+- `lambda.1se`: 交互驗證誤差距離最小 `cvm` 一單位標準差內的最大 `lambda` 值，可增加逞罰效果。
+
+
+以 `cv.glmnet` 函數選擇合適的 `lambda` 值後，將挑選的 `lambda` 輸入 `glmnet` 建立最終模型。
 
 ```{r setseed, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE}
 set.seed(2025)
 ```
+
+以下為信用卡資料分析的示範程式
 
 ```{r creFitRidge, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
 # Fit Ridge and tune lambda via CV
@@ -168,6 +186,8 @@ m_en <- glmnet(modelmat, y, family = "gaussian", alpha = 0.3,
                lambda = en_cv$lambda.1se)
 ```
 
+比較 Ridge、Lasso、Elastic net $(\alpha=0.3)$ regression coefficients。
+
 ```{r glmnetCompare, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
 regMethodResult <- cbind(
   rbind("(Intercept)" = m_rid$a0, m_rid$beta),
@@ -180,69 +200,121 @@ regMethodResult
 
 ### Group Lasso & Sparse Group Lasso
 
-Regularization Method 
+本節介紹兩種基於常用 Regularization Method 的延伸方法，與常用方法獨立對變數的迴歸係數進行壓縮不同，以下介紹的兩種方法為 Group Lasso 及 Sparse Group Lasso，使用上首先由使用者主觀方式將解釋變數分組，模型針對各組變數的迴歸係數加上逞罰效果，使整組變數一次被挑選出或剔除掉。
 
-```{r loadgglasso, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
-library(gglasso)
-```
 
-```{r creFitGL, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
-names(creDf)
+同樣以信用卡資料作為範例，除了各變數的主作用之外，再加入與 `Income` 相關的交互作用項: `Income:Age`、`Income:Education`、`Income:Own`、`Income:Student`。
+
+先將資料依照需求整理成 `model.matrix` 格式。
+
+```{r crePrepGL, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
 modelmat2fi <- model.matrix(
   Balance ~ . + Income * (Age + Education + Own + Student), data = creDf
-)[,-1]
+)[,-1] # Remove intercept from the model matrix
 colnames(modelmat2fi)
+```
+
+手動將 `model.matrix` 的欄位分組，期望：
+
+- 與 `Income` 相關的交互作用項及其主作用皆為同一組
+- `Region`轉換出的兩個 Dummy variables 為同一組
+- 其他變數各自為一組
+
+```{r creGIDGL, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
 twofi_group <- c(1, 2, 3, 4, 1, 
                  1, 1, 1, 5, 6, 
                  6, 1, 1, 1, 1)
 names(twofi_group) <- colnames(modelmat2fi)
 twofi_group
+```
+
+套件 **gglasso** 為 Group Lasso Regression 的建模套件，使用方法類似於 **glmnet** 套件，差別在於需要在 `group` 項輸入變數分組。
+
+文件連結[點此](https://cran.r-project.org/web/packages/gglasso/index.html)
+
+```{r loadgglasso, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
+library(gglasso)
+```
+
+以下為使用 Group Lasso 分析信用卡資料內指定交互作用項的示範程式
+
+```{r creFitGL, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
 # Group Lasso: choose best lambda
 glas_cv <- cv.gglasso(modelmat2fi, y, group = twofi_group, loss = "ls")
-glas_cv$lambda.min
-glas_cv$lambda.1se
+# Refit Group Lasso with proper lambda
 m_glas <- gglasso(modelmat2fi, y, group = twofi_group, loss = "ls",
                   lambda = glas_cv$lambda.1se)
-m_glas$b0
-m_glas$beta
 ```
+
+**Sparse Group Lasso** 相較於 Group Lasso 多了在同一組變數內增加 L1-penalty ，使得模型除了對各組變數的迴歸係數進行壓縮外，同時也組內的各變數進行迴歸係數壓縮，因此，Sparse Group Lasso 首先判斷一整組變數是否為關鍵變數組，再從組內挑出關鍵變數。
+
+文件連結[點此](https://cran.r-project.org/web/packages/sparsegl/index.html)
+
+使用方法類似 **gglasso** 及 **glmnet** 套件，惟須要設定 `asparse` L1-penalty 的懲罰程度，`asparse` 越大，表示組內變數迴歸係數的壓縮程度越大。
 
 ```{r loadSGL, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
 library(sparsegl)
 ```
 
+以下為使用 Sparse Group Lasso 分析信用卡資料內指定交互作用項的示範程式
+
 ```{r creFitSGL, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
-# Sparse group lasso  application to modeling 2fi
 # Sparse Group Lasso: choose best lambda using CV
-#
 sglas_cv <- cv.sparsegl(modelmat2fi, y, group = twofi_group, family = "gaussian",
                         asparse = 0.05) # set weight of L1-penalty as 0.05
-sglas_cv$lambda.min
-sglas_cv$lambda.1se
+# Refit Sparse Group Lasso with proper lambda
 m_sglas <- sparsegl(modelmat2fi, y, group = twofi_group, family = "gaussian",
                     lambda = sglas_cv$lambda.1se, asparse = 0.05)
-m_sglas$b0
-m_sglas$beta
+```
+
+
+比較 Group Lasso、Sparse Group Lasso $(\alpha=0.05)$ regression coefficients。
+
+```{r ggCompare, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
+advRegMethodResult <- cbind(
+  rbind("(Intercept)" = m_glas$b0, m_glas$beta),
+  rbind("(Intercept)" = m_sglas$b0, m_sglas$beta)
+)
+colnames(advRegMethodResult) <- c("GroupLasso", "SGLasso")
+advRegMethodResult
 ```
 
 ## Sure Independence Screening for Ultrahigh Dimensional Data
 
+套件 **SIS** 為 Sure Independence Screening 的實作套件，用於超高維度的變數選擇問題。
+
+文件連結[點此](https://cran.r-project.org/web/packages/SIS/index.html)
+
 ```{r loadSIS, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
 library(SIS)
 ```
-```{r leukemiaFitSIS, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
+
+以套件 **SIS** 內建的 `leukemia.train` 資料作為示範例，該資料共有 38 筆資料，及 7129 個解釋變數（`V1` ~ `V7129`），欄位 `V7130` 為二元反應變數。
+
+```{r leukemiaData, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
 # Sure independence screening
 data(leukemia.train)
 # response vatiable: V7130
 dim(leukemia.train)
 # [1]   38 7130
+```
+
+若直接以 `glm` 建立 Logistic Regression，若不注意，函數並不會回傳任何有關維度過大的警告訊息，且最多只會輸出同樣本數數量的參數估計結果，且估計值通常極不穩定，無法從模型解讀出太多資訊。
+
+```{r leukemiaFitGLM, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
 # WRONG: use glm to fit the ultrahigh dimensional leukemia data
-glm_lkm <- glm(V7130 ~ ., data = leukemia.train,
-               family = binomial(link = "logit"))
+glm_lkm <- glm(V7130 ~ ., data = leukemia.train, family = binomial(link = "logit"))
 # summary(glm_lkm)
 dim(summary(glm_lkm)$coefficients)
 # [1] 38  4
 head(summary(glm_lkm)$coefficients, 6)
+```
+
+若遇到超高維度的分析問題，可先嘗試使用 SIS 對分析資料進行降維，以下為使用 SIS 分析 `leukemia.train` 資料的示範程式。
+
+將解釋變數整理成 `model.matrix` 格式，並指定反應變數向量。
+
+```{r leukemiaFitSIS, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
 # SIS method
 lkm_x <- model.matrix(V7130 ~ ., data = leukemia.train)[,-1]
 lkm_y <- leukemia.train[,7130]
@@ -250,22 +322,29 @@ sis_lkm <- SIS(lkm_x, lkm_y, family = "binomial", penalty = "lasso",
                tune = "bic", seed = 1) #, varISIS = "vanilla"
 # SIS selected
 colnames(lkm_x)[sis_lkm$ix]
-# [1] "V3320" "V3810"
-lkm_x_sis <- lkm_x[,sis_lkm$ix]
+```
 
+根據 SIS 結果，僅從 `leukemia.train` 資料中解析出兩個重要變數 `r colnames(lkm_x)[sis_lkm$ix[1]]` 及 `r colnames(lkm_x)[sis_lkm$ix[2]]`，可作圖觀察此變數分別於 `y=0` 及 `y=1` 時的分布，較容易看出於 Y 不同時，此兩變數的數值分布具有視覺上的差異。
+
+```{r leukemiaFitSISPlot, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
+lkm_x_sis <- lkm_x[,sis_lkm$ix]
 ggpairs(data.frame(cbind(lkm_x_sis, y = lkm_y)),
         aes(colour = as.factor(lkm_y), alpha = 0.4))
+```
 
-glm_lkm_s <- glmnet(x = lkm_x_sis, y = lkm_y,
-                    family = "binomial", alpha = 0, lambda = 0)
-glm_lkm_s$a0
-glm_lkm_s$beta
+此時，再以 `glm` 函數只針對兩個重要變數 `V3320` 及 `V3810` 建立 Logistic Regression。
 
+```{r leukemiaFitReducedGLM, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
 leukemia_sis <- data.frame(cbind(lkm_x_sis, y = lkm_y))
 summary(glm(y ~ ., data = leukemia_sis, family = binomial(link = "logit")))
 ```
 
+## 參考文獻
 
+- Fan, J., & Lv , J. (2008). Sure independence screening for ultrahigh dimensional feature space. *Journal of the Royal Statistical Society Series B: Statistical Methodology*, **70(5)**, 849 - 911.
+- Simon, N., Friedman, J., Hastie, T., & Tibshirani , R. (2013). A sparse group lasso. *Journal of computational and graphical statistics*, 22(2), 231 - 245.
+- Yuan, M. and L. Lin (2006), Model Selection and Estimation in Regression with Grouped Variables, *Journal of the Royal Statistical Society, Series B: Statistical Methodology*, **68**, 49 - 67.
+- Zou, H., & Hastie, T. (2005). Regularization and variable selection via the elastic net. *Journal of the Royal Statistical Society Series B: Statistical Methodology*, **67(2)**, 301 - 320.
 
 # Homework: Lasso Tool Comparison
 
