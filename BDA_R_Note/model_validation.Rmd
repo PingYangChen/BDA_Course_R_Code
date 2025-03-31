@@ -1,0 +1,335 @@
+---
+title: "Model Validation"
+author: "Ping-Yang Chen"
+output:
+  prettydoc::html_pretty:
+    theme: tactile 
+    highlight: github
+    math: katex
+    toc: true
+    self-contained: true
+#date: "2024-03-26"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+以信用卡資料作為範例，讀取資料並整理成迴歸分析所需格式
+
+```{r creDfRead, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
+creUrl <- 'https://raw.githubusercontent.com/PingYangChen/BDA_Course_R_Code/refs/heads/main/sample_data/Credit.csv'
+creDf <- read.csv(creUrl)
+```
+
+針對類別型變數，在 R 中請自行將欄位更改為 `factor` 型態。
+```{r creDfSetProp, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
+creDf$Own <- as.factor(creDf$Own)
+creDf$Student <- as.factor(creDf$Student)
+creDf$Married <- as.factor(creDf$Married)
+creDf$Region <- as.factor(creDf$Region)
+```
+
+先將資料整理成 `glmnet` 所需格式：`model.matrix`。
+
+- 反應變數可直接從資料中擷取。
+- 解釋變數則透過 `model.matrix` 函數與 R 模型語法快速整理**（記得刪除截距項）**。
+
+```{r creDfModelMat, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
+# Create Response Variable
+y <- creDf$Balance
+# Create model matrix
+modelmat <- model.matrix(Balance ~ ., data = creDf)[,-1] # Remove intercept part
+```
+
+試建立 Elastic Net Regression，並計算模型配適值的誤差（MSE）。
+
+```{r loadglmnet, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
+library(glmnet)
+```
+
+```{r fitEN, eval=TRUE, echo=TRUE, message=FALSE, warning=FALSE}
+# fit elastic-net regression model with alpha = 0.5, lambda = 5
+en_fit <- glmnet(modelmat, y, family = "gaussian", alpha = 0.5, lambda = 5)
+# Compute MSE of the fitted values
+y_en_fit <- predict(en_fit, modelmat)
+# view the fitted error
+mse_en <- mean((y - y_en_fit)^2)
+print(mse_en) 
+```
+
+# In-class Practice I: Tuning Hyperparameters of Elastic Net Regression
+
+從模型選擇張籍我們知道，Elastic Net Regression 有兩種超參數 `alpha` 及 `lambda`，若要配適一最合適的 Elastic Net 模型，合理上應嘗試多種 `alpha` 及 `lambda` 的組合，然而 **glmnet** 套件的 `cv.glmnet` 函數只提供 `lambda` 值的自動超參數挑選功能，使得我們必須自行對不同 `alpha` 值作驗證來決定一個好的 `alpha` 值。
+
+此時，便得自己切分訓練測試集與執行交互驗證，步驟如下
+
+1. 準備超參數集
+
+```{r setHyper, eval=TRUE, echo=TRUE, message=FALSE, warning=FALSE}
+# tuning sets of alpha and lambda
+alpha_set <- c(0.3, 0.5, 0.7)
+lambda_set <- exp(seq(-3, 1, length = 50))
+# create a 150x2 matrix of all candidates of alpha and lambda values
+param_cand <- cbind(
+  rep(alpha_set, time = length(lambda_set)),
+  rep(lambda_set, each = length(alpha_set))
+)
+# Create space for storing MSE values of all parameter candidates
+mse_cv_tune <- numeric(nrow(param_cand))
+```
+
+2. 切分訓練測試集
+
+```{r loadpracma, eval=TRUE, echo=TRUE, message=FALSE, warning=FALSE}
+# Make CV-folds by yourself
+library(pracma)
+```
+
+```{r splitDataEN, eval=TRUE, echo=TRUE, message=FALSE, warning=FALSE}
+# Implement 10-fold CV
+n <- length(y)
+nfold <- 10 # set number of folds
+# Always remember to set seed before actions with randomness involved!!
+seed <- 1
+set.seed(seed)
+# Create belonging folds for each data point
+# by randomly permuting the index of folds.
+folds <- pracma::randperm( 
+  rep(1:nfold, time = ceiling(n/nfold))[1:n]
+)
+# View the distribution of testing data sizes in each fold
+table(folds)
+```
+
+3. 執行交互驗證（請填入 `### --- ??? --- ###` 部分）
+
+```{r ENCVPrac, eval=FALSE, echo=TRUE, message=FALSE, warning=FALSE}
+# Start parameter tuning
+for (ipar in 1:nrow(param_cand)) {
+  
+  # Create empty vector for storing predicted values
+  ### --- ??? --- ###
+  
+  # Start 10-fold CV
+  for (k in 1:nfold) {
+    # Prepare training data
+    ### --- ??? --- ###
+    
+    # Fit EN model with training data
+    en_fold <- glmnet(train_x, train_y, family = "gaussian", 
+                      alpha = param_cand[ipar,1], lambda = param_cand[ipar,2])
+    # Prepare testing data
+    ### --- ??? --- ###
+    
+    # Predict using EN model with testing data
+    yhat_fold <- predict(en_fold, test_x) 
+    
+    # Allocate those predicted values into the corresponding fold
+    ### --- ??? --- ###
+    
+  }
+  # Compute MSE of the cross-validation
+  
+  mse_cv <- ### --- ??? --- ###
+    
+  mse_cv_tune[ipar] <- mse_cv
+}
+```
+
+```{r ENCVANswer, eval=TRUE, echo=FALSE, message=FALSE, warning=FALSE}
+# Start parameter tuning
+for (ipar in 1:nrow(param_cand)) {
+  # Create empty vector for storing predicted values
+  yhat_cv <- numeric(length(y))
+  # Start 10-fold CV
+  for (k in 1:nfold) {
+    # Prepare training data
+    train_id <- which(folds != k)
+    train_x <- modelmat[train_id,]
+    train_y <- y[train_id]
+    # Fit EN model with training data
+    en_fold <- glmnet(train_x, train_y, family = "gaussian", 
+                      alpha = param_cand[ipar,1], lambda = param_cand[ipar,2])
+    # Prepare testing data
+    test_id <- which(folds == k)
+    test_x <- modelmat[test_id,]
+    # Predict using EN model with testing data
+    yhat_fold <- predict(en_fold, test_x) 
+    # Allocate those predicted values into the corresponding fold
+    yhat_cv[test_id] <- yhat_fold
+  }
+  # Compute MSE of the cross-validation
+  mse_cv <- mean((y - yhat_cv)^2)
+  mse_cv_tune[ipar] <- mse_cv
+}
+```
+
+4. 檢視最佳超參數
+
+```{r ENCVView, eval=TRUE, echo=TRUE, message=FALSE, warning=FALSE}
+best_param <- param_cand[which.min(mse_cv_tune),]
+sprintf("Min. CV = %.2f, Best alpha = %.1f, lambda = %f", 
+        min(mse_cv_tune), best_param[1], best_param[2])
+```
+
+
+# In-class Practice II: Validation for Principle Component Regression
+
+當遇到需要組合、串接分析方法時，需要思考如何中立且忠實地呈現交互驗證結果。
+
+以 Principle Component Regression 為例，建模流程如以下程式
+
+- 首先對 `model.matrix` 使用 `prcomp` 函數進行主成分分析（資料須標準化）
+- 取出主要的主成分 `modelmat_pc` （如累積解釋變異達 90% 的前數個主成分）
+- 建練迴歸模型 OLS Regression（因已將解釋變數轉為 `model.matrix`，在此用 **glmnet** 較方便）
+- 計算配適值誤差
+
+```{r pcrFit, eval=TRUE, echo=TRUE, message=FALSE, warning=FALSE}
+# Compute principal components 
+# scale the data due to inconsistent unit
+pca <- prcomp(modelmat, scale. = TRUE) 
+# compute variances
+pvars <- (pca$sdev)^2 
+# compute cumulative variances
+pvars_props_cum <- cumsum(pvars/sum(pvars)) 
+# Use the PCs with cumulated variance exceeding 90%
+n_pcs <- min(which(pvars_props_cum >= 0.9))
+# Get the principle components
+modelmat_pc <- pca$x[,1:n_pcs]
+colnames(modelmat_pc) <- paste0("PC", 1:n_pcs)
+
+# Fit Regression model for the transformed data
+pcr_fit <- glmnet(modelmat_pc, y, family = "gaussian", alpha = 0, lambda = 0)
+# Compute MSE
+y_pcr_fit <- predict(pcr_fit, modelmat_pc)
+mse_pcr <- mean((y - y_pcr_fit)^2) # [1] 65982.34
+```
+
+針對取出主成分，除了直接從 `prcomp` 函數的輸出取出 `$x` 外，手動寫程式的取法如下
+
+```{r pcaManual, eval=TRUE, echo=TRUE, message=FALSE, warning=FALSE}
+# Compute principal components
+pca <- prcomp(modelmat, scale. = TRUE) # scale the data due to inconsistent unit
+# The result of principal components is
+# pca$x
+
+# Manually compute the principal components 
+## First, create matrices for standardizing the original data, ‘modelmat’
+center_mat <- matrix(
+  pca$center, nrow = nrow(modelmat), ncol = length(pca$center), byrow = TRUE)  
+scale_mat <- matrix(
+  pca$scale, nrow = nrow(modelmat), ncol = length(pca$scale), byrow = TRUE) 
+## Second, standardize the original data, 
+modelmat_std <- (modelmat - center_mat)/scale_mat
+## Third, rotate the standardized data to the principal component space
+modelmat_pcs <- modelmat_std %*% pca$rotation
+
+# See is the result identical to pca$x
+all((modelmat_pcs - pca$x) == 0) # [1] TRUE
+```
+
+
+執行主成分迴歸分析的交互驗證，步驟如下
+
+1. 切分訓練測試集
+
+```{r splitDataPCR, eval=TRUE, echo=TRUE, message=FALSE, warning=FALSE}
+# Make CV-folds by yourself
+library(pracma)
+# Implement 10-fold CV
+n <- length(y)
+nfold <- 10 # set number of folds
+# Always remember to set seed before actions with randomness involved!!
+seed <- 1
+set.seed(seed)
+# Create belonging folds for each data point
+# by randomly permuting the index of folds.
+folds <- pracma::randperm( 
+  rep(1:nfold, time = ceiling(n/nfold))[1:n]
+)
+```
+
+2. 執行交互驗證（請填入 `### --- ??? --- ###` 部分）
+
+```{r PCRCVPrac, eval=FALSE, echo=TRUE, message=FALSE, warning=FALSE}
+# Create empty vector for storing predicted values
+yhat_cv <- numeric(length(y))
+
+# Start 10-fold CV
+for (k in 1:nfold) {
+  # Prepare training data
+  train_id <- which(folds != k)
+  train_x <- modelmat[train_id,]
+  train_y <- y[train_id]
+  
+  # Transform the data into PCs with cumulated variance exceeding 90%
+  ### --- ??? --- ###
+  
+  # Fit OLS model for the transformed data
+  pcr_fold <- glmnet(### --- ??? --- ###
+                     , y, family = "gaussian", alpha = 0, lambda = 0)
+  
+  # Prepare the testing data
+  test_id <- which(folds == k)
+  test_x <- modelmat[test_id,]
+  
+  # Standardize the testing data using center and scale parameters of the training data
+  ### --- ??? --- ###
+  
+  # Rotate the standardized testing data using trained PCA coordinates
+  ### --- ??? --- ###
+  
+  # Predict using OLS model with transformed testing data
+  yhat_fold <- ### --- ??? --- ###
+    
+  # Allocate those predicted values into the corresponding fold
+  yhat_cv[test_id] <- yhat_fold
+  
+}
+# Compute MSE of the cross-validation
+mse_cv <- mean((y - yhat_cv)^2)
+print(mse_cv) 
+```
+
+
+
+```{r PCRCVANswer, eval=TRUE, echo=FALSE, message=FALSE, warning=FALSE}
+# Create empty vector for storing predicted values
+yhat_cv <- numeric(length(y))
+# Start 10-fold CV
+for (k in 1:nfold) {
+  # Prepare training data
+  train_id <- which(folds != k)
+  train_x <- modelmat[train_id,]
+  train_y <- y[train_id]
+  # Transform the data into PCs with cumulated variance exceeding 90%
+  pca_fold <- prcomp(modelmat, scale. = TRUE) 
+  pvars <- (pca_fold$sdev)^2 
+  pvars_props_cum <- cumsum(pvars/sum(pvars)) 
+  n_pcs_fold <- min(which(pvars_props_cum >= 0.9))
+  train_x_pca <- pca_fold$x[,1:n_pcs_fold]
+  colnames(train_x_pca) <- paste0("PC", 1:n_pcs_fold)
+  # Fit OLS model for the transformed data
+  pcr_fold <- glmnet(train_x_pca, y, family = "gaussian", alpha = 0, lambda = 0)
+  # Prepare the testing data
+  test_id <- which(folds == k)
+  test_x <- modelmat[test_id,]
+  # Standardize the testing data using center and scale parameters of the training data
+  center_mat_fold <- matrix(
+    pca_fold$center, nrow = nrow(test_x), ncol = length(pca_fold$center), byrow = TRUE)  
+  scale_mat_fold <- matrix(
+    pca_fold$scale, nrow = nrow(test_x), ncol = length(pca_fold$scale), byrow = TRUE)
+  test_x_std <- (test_x - center_mat_fold)/scale_mat_fold
+  # Rotate the standardized testing data using trained PCA coordinates
+  test_x_pca <- (test_x_std %*% pca_fold$rotation)[,1:n_pcs_fold]
+  colnames(test_x_pca) <- paste0("PC", 1:n_pcs_fold)
+  # Predict using OLS model with transformed testing data
+  yhat_fold <- predict(pcr_fold, test_x_pca)
+  # Allocate those predicted values into the corresponding fold
+  yhat_cv[test_id] <- yhat_fold
+}
+# Compute MSE of the cross-validation
+mse_cv <- mean((y - yhat_cv)^2)
+print(mse_cv) 
+```
