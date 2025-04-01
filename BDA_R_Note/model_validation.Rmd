@@ -199,12 +199,43 @@ n_pcs <- min(which(pvars_props_cum >= 0.9))
 modelmat_pc <- pca$x[,1:n_pcs]
 colnames(modelmat_pc) <- paste0("PC", 1:n_pcs)
 
+dim(modelmat)
+dim(modelmat_pc)
+
+head(modelmat_pc, 4)
+
 # Fit Regression model for the transformed data
 pcr_fit <- glmnet(modelmat_pc, y, family = "gaussian", alpha = 0, lambda = 0)
 # Compute MSE
 y_pcr_fit <- predict(pcr_fit, modelmat_pc)
 mse_pcr <- mean((y - y_pcr_fit)^2) # [1] 65982.34
 ```
+
+<!--
+```{r}
+# Create empty vector for storing predicted values
+yhat_cv <- numeric(length(y))
+# Start 10-fold CV
+for (k in 1:nfold) {
+  # Prepare training data
+  train_id <- which(folds != k)
+  train_x <- modelmat_pc[train_id,]
+  train_y <- y[train_id]
+  # Fit EN model with training data
+  lm_fold <- glmnet(train_x, train_y, family = "gaussian", 
+                    alpha = 0, lambda = 0)
+  # Prepare testing data
+  test_id <- which(folds == k)
+  test_x <- modelmat_pc[test_id,]
+  # Predict using EN model with testing data
+  yhat_fold <- predict(lm_fold, test_x) 
+  # Allocate those predicted values into the corresponding fold
+  yhat_cv[test_id] <- yhat_fold
+}
+# Compute MSE of the cross-validation
+mse_cv <- mean((y - yhat_cv)^2)
+```
+-->
 
 針對取出主成分，除了直接從 `prcomp` 函數的輸出取出 `$x` 外，手動寫程式的取法如下
 
@@ -304,14 +335,14 @@ for (k in 1:nfold) {
   train_x <- modelmat[train_id,]
   train_y <- y[train_id]
   # Transform the data into PCs with cumulated variance exceeding 90%
-  pca_fold <- prcomp(modelmat, scale. = TRUE) 
+  pca_fold <- prcomp(train_x, scale. = TRUE) 
   pvars <- (pca_fold$sdev)^2 
   pvars_props_cum <- cumsum(pvars/sum(pvars)) 
   n_pcs_fold <- min(which(pvars_props_cum >= 0.9))
   train_x_pca <- pca_fold$x[,1:n_pcs_fold]
   colnames(train_x_pca) <- paste0("PC", 1:n_pcs_fold)
   # Fit OLS model for the transformed data
-  pcr_fold <- glmnet(train_x_pca, y, family = "gaussian", alpha = 0, lambda = 0)
+  pcr_fold <- glmnet(train_x_pca, train_y, family = "gaussian", alpha = 0, lambda = 0)
   # Prepare the testing data
   test_id <- which(folds == k)
   test_x <- modelmat[test_id,]
