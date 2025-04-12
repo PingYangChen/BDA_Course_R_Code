@@ -17,7 +17,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 # 優化程式碼
 
-```{r}
+```{r} 
 # 輸出矩陣每列的最大值
 n <- 1e7
 p <- 10
