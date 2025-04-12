@@ -325,90 +325,131 @@ Regression</h1>
 <span id="cb14-11"><a href="#cb14-11" tabindex="-1"></a>modelmat_pc <span class="ot">&lt;-</span> pca<span class="sc">$</span>x[,<span class="dv">1</span><span class="sc">:</span>n_pcs]</span>
 <span id="cb14-12"><a href="#cb14-12" tabindex="-1"></a><span class="fu">colnames</span>(modelmat_pc) <span class="ot">&lt;-</span> <span class="fu">paste0</span>(<span class="st">&quot;PC&quot;</span>, <span class="dv">1</span><span class="sc">:</span>n_pcs)</span>
 <span id="cb14-13"><a href="#cb14-13" tabindex="-1"></a></span>
-<span id="cb14-14"><a href="#cb14-14" tabindex="-1"></a><span class="co"># Fit Regression model for the transformed data</span></span>
-<span id="cb14-15"><a href="#cb14-15" tabindex="-1"></a>pcr_fit <span class="ot">&lt;-</span> <span class="fu">glmnet</span>(modelmat_pc, y, <span class="at">family =</span> <span class="st">&quot;gaussian&quot;</span>, <span class="at">alpha =</span> <span class="dv">0</span>, <span class="at">lambda =</span> <span class="dv">0</span>)</span>
-<span id="cb14-16"><a href="#cb14-16" tabindex="-1"></a><span class="co"># Compute MSE</span></span>
-<span id="cb14-17"><a href="#cb14-17" tabindex="-1"></a>y_pcr_fit <span class="ot">&lt;-</span> <span class="fu">predict</span>(pcr_fit, modelmat_pc)</span>
-<span id="cb14-18"><a href="#cb14-18" tabindex="-1"></a>mse_pcr <span class="ot">&lt;-</span> <span class="fu">mean</span>((y <span class="sc">-</span> y_pcr_fit)<span class="sc">^</span><span class="dv">2</span>) <span class="co"># [1] 65982.34</span></span></code></pre></div>
+<span id="cb14-14"><a href="#cb14-14" tabindex="-1"></a><span class="fu">dim</span>(modelmat)</span></code></pre></div>
+<pre><code>## [1] 400  11</code></pre>
+<div class="sourceCode" id="cb16"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb16-1"><a href="#cb16-1" tabindex="-1"></a><span class="fu">dim</span>(modelmat_pc)</span></code></pre></div>
+<pre><code>## [1] 400   8</code></pre>
+<div class="sourceCode" id="cb18"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb18-1"><a href="#cb18-1" tabindex="-1"></a><span class="fu">head</span>(modelmat_pc, <span class="dv">4</span>)</span></code></pre></div>
+<pre><code>##         PC1       PC2        PC3        PC4         PC5        PC6         PC7
+## 1 -1.130664  1.138607  0.4352281  1.4549232  0.05271601 -1.3495402 -0.06475645
+## 2  2.037304 -2.389332 -1.9345108 -1.0343808  0.18626633  1.0702303  0.70254510
+## 3  2.160777 -1.593558  1.4202936 -1.6105301 -0.59959856 -0.6485451 -0.26223769
+## 4  3.835089 -1.920744  0.1134186 -0.4359443  1.45806878 -1.1582621 -0.25504818
+##          PC8
+## 1 -0.4727283
+## 2 -2.1194826
+## 3  0.1420906
+## 4  1.4752655</code></pre>
+<div class="sourceCode" id="cb20"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb20-1"><a href="#cb20-1" tabindex="-1"></a><span class="co"># Fit Regression model for the transformed data</span></span>
+<span id="cb20-2"><a href="#cb20-2" tabindex="-1"></a>pcr_fit <span class="ot">&lt;-</span> <span class="fu">glmnet</span>(modelmat_pc, y, <span class="at">family =</span> <span class="st">&quot;gaussian&quot;</span>, <span class="at">alpha =</span> <span class="dv">0</span>, <span class="at">lambda =</span> <span class="dv">0</span>)</span>
+<span id="cb20-3"><a href="#cb20-3" tabindex="-1"></a><span class="co"># Compute MSE</span></span>
+<span id="cb20-4"><a href="#cb20-4" tabindex="-1"></a>y_pcr_fit <span class="ot">&lt;-</span> <span class="fu">predict</span>(pcr_fit, modelmat_pc)</span>
+<span id="cb20-5"><a href="#cb20-5" tabindex="-1"></a>mse_pcr <span class="ot">&lt;-</span> <span class="fu">mean</span>((y <span class="sc">-</span> y_pcr_fit)<span class="sc">^</span><span class="dv">2</span>) <span class="co"># [1] 65982.34</span></span></code></pre></div>
+<!--
+
+``` r
+# Create empty vector for storing predicted values
+yhat_cv <- numeric(length(y))
+# Start 10-fold CV
+for (k in 1:nfold) {
+  # Prepare training data
+  train_id <- which(folds != k)
+  train_x <- modelmat_pc[train_id,]
+  train_y <- y[train_id]
+  # Fit EN model with training data
+  lm_fold <- glmnet(train_x, train_y, family = "gaussian", 
+                    alpha = 0, lambda = 0)
+  # Prepare testing data
+  test_id <- which(folds == k)
+  test_x <- modelmat_pc[test_id,]
+  # Predict using EN model with testing data
+  yhat_fold <- predict(lm_fold, test_x) 
+  # Allocate those predicted values into the corresponding fold
+  yhat_cv[test_id] <- yhat_fold
+}
+# Compute MSE of the cross-validation
+mse_cv <- mean((y - yhat_cv)^2)
+```
+-->
 <p>針對取出主成分，除了直接從 <code>prcomp</code> 函數的輸出取出
 <code>$x</code> 外，手動寫程式的取法如下</p>
-<div class="sourceCode" id="cb15"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb15-1"><a href="#cb15-1" tabindex="-1"></a><span class="co"># Compute principal components</span></span>
-<span id="cb15-2"><a href="#cb15-2" tabindex="-1"></a>pca <span class="ot">&lt;-</span> <span class="fu">prcomp</span>(modelmat, <span class="at">scale. =</span> <span class="cn">TRUE</span>) <span class="co"># scale the data due to inconsistent unit</span></span>
-<span id="cb15-3"><a href="#cb15-3" tabindex="-1"></a><span class="co"># The result of principal components is</span></span>
-<span id="cb15-4"><a href="#cb15-4" tabindex="-1"></a><span class="co"># pca$x</span></span>
-<span id="cb15-5"><a href="#cb15-5" tabindex="-1"></a></span>
-<span id="cb15-6"><a href="#cb15-6" tabindex="-1"></a><span class="co"># Manually compute the principal components </span></span>
-<span id="cb15-7"><a href="#cb15-7" tabindex="-1"></a><span class="do">## First, create matrices for standardizing the original data, ‘modelmat’</span></span>
-<span id="cb15-8"><a href="#cb15-8" tabindex="-1"></a>center_mat <span class="ot">&lt;-</span> <span class="fu">matrix</span>(</span>
-<span id="cb15-9"><a href="#cb15-9" tabindex="-1"></a>  pca<span class="sc">$</span>center, <span class="at">nrow =</span> <span class="fu">nrow</span>(modelmat), <span class="at">ncol =</span> <span class="fu">length</span>(pca<span class="sc">$</span>center), <span class="at">byrow =</span> <span class="cn">TRUE</span>)  </span>
-<span id="cb15-10"><a href="#cb15-10" tabindex="-1"></a>scale_mat <span class="ot">&lt;-</span> <span class="fu">matrix</span>(</span>
-<span id="cb15-11"><a href="#cb15-11" tabindex="-1"></a>  pca<span class="sc">$</span>scale, <span class="at">nrow =</span> <span class="fu">nrow</span>(modelmat), <span class="at">ncol =</span> <span class="fu">length</span>(pca<span class="sc">$</span>scale), <span class="at">byrow =</span> <span class="cn">TRUE</span>) </span>
-<span id="cb15-12"><a href="#cb15-12" tabindex="-1"></a><span class="do">## Second, standardize the original data, </span></span>
-<span id="cb15-13"><a href="#cb15-13" tabindex="-1"></a>modelmat_std <span class="ot">&lt;-</span> (modelmat <span class="sc">-</span> center_mat)<span class="sc">/</span>scale_mat</span>
-<span id="cb15-14"><a href="#cb15-14" tabindex="-1"></a><span class="do">## Third, rotate the standardized data to the principal component space</span></span>
-<span id="cb15-15"><a href="#cb15-15" tabindex="-1"></a>modelmat_pcs <span class="ot">&lt;-</span> modelmat_std <span class="sc">%*%</span> pca<span class="sc">$</span>rotation</span>
-<span id="cb15-16"><a href="#cb15-16" tabindex="-1"></a></span>
-<span id="cb15-17"><a href="#cb15-17" tabindex="-1"></a><span class="co"># See is the result identical to pca$x</span></span>
-<span id="cb15-18"><a href="#cb15-18" tabindex="-1"></a><span class="fu">all</span>((modelmat_pcs <span class="sc">-</span> pca<span class="sc">$</span>x) <span class="sc">==</span> <span class="dv">0</span>) <span class="co"># [1] TRUE</span></span></code></pre></div>
+<div class="sourceCode" id="cb21"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb21-1"><a href="#cb21-1" tabindex="-1"></a><span class="co"># Compute principal components</span></span>
+<span id="cb21-2"><a href="#cb21-2" tabindex="-1"></a>pca <span class="ot">&lt;-</span> <span class="fu">prcomp</span>(modelmat, <span class="at">scale. =</span> <span class="cn">TRUE</span>) <span class="co"># scale the data due to inconsistent unit</span></span>
+<span id="cb21-3"><a href="#cb21-3" tabindex="-1"></a><span class="co"># The result of principal components is</span></span>
+<span id="cb21-4"><a href="#cb21-4" tabindex="-1"></a><span class="co"># pca$x</span></span>
+<span id="cb21-5"><a href="#cb21-5" tabindex="-1"></a></span>
+<span id="cb21-6"><a href="#cb21-6" tabindex="-1"></a><span class="co"># Manually compute the principal components </span></span>
+<span id="cb21-7"><a href="#cb21-7" tabindex="-1"></a><span class="do">## First, create matrices for standardizing the original data, ‘modelmat’</span></span>
+<span id="cb21-8"><a href="#cb21-8" tabindex="-1"></a>center_mat <span class="ot">&lt;-</span> <span class="fu">matrix</span>(</span>
+<span id="cb21-9"><a href="#cb21-9" tabindex="-1"></a>  pca<span class="sc">$</span>center, <span class="at">nrow =</span> <span class="fu">nrow</span>(modelmat), <span class="at">ncol =</span> <span class="fu">length</span>(pca<span class="sc">$</span>center), <span class="at">byrow =</span> <span class="cn">TRUE</span>)  </span>
+<span id="cb21-10"><a href="#cb21-10" tabindex="-1"></a>scale_mat <span class="ot">&lt;-</span> <span class="fu">matrix</span>(</span>
+<span id="cb21-11"><a href="#cb21-11" tabindex="-1"></a>  pca<span class="sc">$</span>scale, <span class="at">nrow =</span> <span class="fu">nrow</span>(modelmat), <span class="at">ncol =</span> <span class="fu">length</span>(pca<span class="sc">$</span>scale), <span class="at">byrow =</span> <span class="cn">TRUE</span>) </span>
+<span id="cb21-12"><a href="#cb21-12" tabindex="-1"></a><span class="do">## Second, standardize the original data, </span></span>
+<span id="cb21-13"><a href="#cb21-13" tabindex="-1"></a>modelmat_std <span class="ot">&lt;-</span> (modelmat <span class="sc">-</span> center_mat)<span class="sc">/</span>scale_mat</span>
+<span id="cb21-14"><a href="#cb21-14" tabindex="-1"></a><span class="do">## Third, rotate the standardized data to the principal component space</span></span>
+<span id="cb21-15"><a href="#cb21-15" tabindex="-1"></a>modelmat_pcs <span class="ot">&lt;-</span> modelmat_std <span class="sc">%*%</span> pca<span class="sc">$</span>rotation</span>
+<span id="cb21-16"><a href="#cb21-16" tabindex="-1"></a></span>
+<span id="cb21-17"><a href="#cb21-17" tabindex="-1"></a><span class="co"># See is the result identical to pca$x</span></span>
+<span id="cb21-18"><a href="#cb21-18" tabindex="-1"></a><span class="fu">all</span>((modelmat_pcs <span class="sc">-</span> pca<span class="sc">$</span>x) <span class="sc">==</span> <span class="dv">0</span>) <span class="co"># [1] TRUE</span></span></code></pre></div>
 <pre><code>## [1] TRUE</code></pre>
 <p>執行主成分迴歸分析的交互驗證，步驟如下</p>
 <ol style="list-style-type: decimal">
 <li>切分訓練測試集</li>
 </ol>
-<div class="sourceCode" id="cb17"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb17-1"><a href="#cb17-1" tabindex="-1"></a><span class="co"># Make CV-folds by yourself</span></span>
-<span id="cb17-2"><a href="#cb17-2" tabindex="-1"></a><span class="fu">library</span>(pracma)</span>
-<span id="cb17-3"><a href="#cb17-3" tabindex="-1"></a><span class="co"># Implement 10-fold CV</span></span>
-<span id="cb17-4"><a href="#cb17-4" tabindex="-1"></a>n <span class="ot">&lt;-</span> <span class="fu">length</span>(y)</span>
-<span id="cb17-5"><a href="#cb17-5" tabindex="-1"></a>nfold <span class="ot">&lt;-</span> <span class="dv">10</span> <span class="co"># set number of folds</span></span>
-<span id="cb17-6"><a href="#cb17-6" tabindex="-1"></a><span class="co"># Always remember to set seed before actions with randomness involved!!</span></span>
-<span id="cb17-7"><a href="#cb17-7" tabindex="-1"></a>seed <span class="ot">&lt;-</span> <span class="dv">1</span></span>
-<span id="cb17-8"><a href="#cb17-8" tabindex="-1"></a><span class="fu">set.seed</span>(seed)</span>
-<span id="cb17-9"><a href="#cb17-9" tabindex="-1"></a><span class="co"># Create belonging folds for each data point</span></span>
-<span id="cb17-10"><a href="#cb17-10" tabindex="-1"></a><span class="co"># by randomly permuting the index of folds.</span></span>
-<span id="cb17-11"><a href="#cb17-11" tabindex="-1"></a>folds <span class="ot">&lt;-</span> pracma<span class="sc">::</span><span class="fu">randperm</span>( </span>
-<span id="cb17-12"><a href="#cb17-12" tabindex="-1"></a>  <span class="fu">rep</span>(<span class="dv">1</span><span class="sc">:</span>nfold, <span class="at">time =</span> <span class="fu">ceiling</span>(n<span class="sc">/</span>nfold))[<span class="dv">1</span><span class="sc">:</span>n]</span>
-<span id="cb17-13"><a href="#cb17-13" tabindex="-1"></a>)</span></code></pre></div>
+<div class="sourceCode" id="cb23"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb23-1"><a href="#cb23-1" tabindex="-1"></a><span class="co"># Make CV-folds by yourself</span></span>
+<span id="cb23-2"><a href="#cb23-2" tabindex="-1"></a><span class="fu">library</span>(pracma)</span>
+<span id="cb23-3"><a href="#cb23-3" tabindex="-1"></a><span class="co"># Implement 10-fold CV</span></span>
+<span id="cb23-4"><a href="#cb23-4" tabindex="-1"></a>n <span class="ot">&lt;-</span> <span class="fu">length</span>(y)</span>
+<span id="cb23-5"><a href="#cb23-5" tabindex="-1"></a>nfold <span class="ot">&lt;-</span> <span class="dv">10</span> <span class="co"># set number of folds</span></span>
+<span id="cb23-6"><a href="#cb23-6" tabindex="-1"></a><span class="co"># Always remember to set seed before actions with randomness involved!!</span></span>
+<span id="cb23-7"><a href="#cb23-7" tabindex="-1"></a>seed <span class="ot">&lt;-</span> <span class="dv">1</span></span>
+<span id="cb23-8"><a href="#cb23-8" tabindex="-1"></a><span class="fu">set.seed</span>(seed)</span>
+<span id="cb23-9"><a href="#cb23-9" tabindex="-1"></a><span class="co"># Create belonging folds for each data point</span></span>
+<span id="cb23-10"><a href="#cb23-10" tabindex="-1"></a><span class="co"># by randomly permuting the index of folds.</span></span>
+<span id="cb23-11"><a href="#cb23-11" tabindex="-1"></a>folds <span class="ot">&lt;-</span> pracma<span class="sc">::</span><span class="fu">randperm</span>( </span>
+<span id="cb23-12"><a href="#cb23-12" tabindex="-1"></a>  <span class="fu">rep</span>(<span class="dv">1</span><span class="sc">:</span>nfold, <span class="at">time =</span> <span class="fu">ceiling</span>(n<span class="sc">/</span>nfold))[<span class="dv">1</span><span class="sc">:</span>n]</span>
+<span id="cb23-13"><a href="#cb23-13" tabindex="-1"></a>)</span></code></pre></div>
 <ol start="2" style="list-style-type: decimal">
 <li>執行交互驗證（請填入 <code>### --- ??? --- ###</code> 部分）</li>
 </ol>
-<div class="sourceCode" id="cb18"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb18-1"><a href="#cb18-1" tabindex="-1"></a><span class="co"># Create empty vector for storing predicted values</span></span>
-<span id="cb18-2"><a href="#cb18-2" tabindex="-1"></a>yhat_cv <span class="ot">&lt;-</span> <span class="fu">numeric</span>(<span class="fu">length</span>(y))</span>
-<span id="cb18-3"><a href="#cb18-3" tabindex="-1"></a></span>
-<span id="cb18-4"><a href="#cb18-4" tabindex="-1"></a><span class="co"># Start 10-fold CV</span></span>
-<span id="cb18-5"><a href="#cb18-5" tabindex="-1"></a><span class="cf">for</span> (k <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span>nfold) {</span>
-<span id="cb18-6"><a href="#cb18-6" tabindex="-1"></a>  <span class="co"># Prepare training data</span></span>
-<span id="cb18-7"><a href="#cb18-7" tabindex="-1"></a>  train_id <span class="ot">&lt;-</span> <span class="fu">which</span>(folds <span class="sc">!=</span> k)</span>
-<span id="cb18-8"><a href="#cb18-8" tabindex="-1"></a>  train_x <span class="ot">&lt;-</span> modelmat[train_id,]</span>
-<span id="cb18-9"><a href="#cb18-9" tabindex="-1"></a>  train_y <span class="ot">&lt;-</span> y[train_id]</span>
-<span id="cb18-10"><a href="#cb18-10" tabindex="-1"></a>  </span>
-<span id="cb18-11"><a href="#cb18-11" tabindex="-1"></a>  <span class="co"># Transform the data into PCs with cumulated variance exceeding 90%</span></span>
-<span id="cb18-12"><a href="#cb18-12" tabindex="-1"></a>  <span class="do">### --- ??? --- </span><span class="al">###</span></span>
-<span id="cb18-13"><a href="#cb18-13" tabindex="-1"></a>  </span>
-<span id="cb18-14"><a href="#cb18-14" tabindex="-1"></a>  <span class="co"># Fit OLS model for the transformed data</span></span>
-<span id="cb18-15"><a href="#cb18-15" tabindex="-1"></a>  pcr_fold <span class="ot">&lt;-</span> <span class="fu">glmnet</span>(<span class="do">### --- ??? --- </span><span class="al">###</span></span>
-<span id="cb18-16"><a href="#cb18-16" tabindex="-1"></a>                     , y, <span class="at">family =</span> <span class="st">&quot;gaussian&quot;</span>, <span class="at">alpha =</span> <span class="dv">0</span>, <span class="at">lambda =</span> <span class="dv">0</span>)</span>
-<span id="cb18-17"><a href="#cb18-17" tabindex="-1"></a>  </span>
-<span id="cb18-18"><a href="#cb18-18" tabindex="-1"></a>  <span class="co"># Prepare the testing data</span></span>
-<span id="cb18-19"><a href="#cb18-19" tabindex="-1"></a>  test_id <span class="ot">&lt;-</span> <span class="fu">which</span>(folds <span class="sc">==</span> k)</span>
-<span id="cb18-20"><a href="#cb18-20" tabindex="-1"></a>  test_x <span class="ot">&lt;-</span> modelmat[test_id,]</span>
-<span id="cb18-21"><a href="#cb18-21" tabindex="-1"></a>  </span>
-<span id="cb18-22"><a href="#cb18-22" tabindex="-1"></a>  <span class="co"># Standardize the testing data using center and scale parameters of the training data</span></span>
-<span id="cb18-23"><a href="#cb18-23" tabindex="-1"></a>  <span class="do">### --- ??? --- </span><span class="al">###</span></span>
-<span id="cb18-24"><a href="#cb18-24" tabindex="-1"></a>  </span>
-<span id="cb18-25"><a href="#cb18-25" tabindex="-1"></a>  <span class="co"># Rotate the standardized testing data using trained PCA coordinates</span></span>
-<span id="cb18-26"><a href="#cb18-26" tabindex="-1"></a>  <span class="do">### --- ??? --- </span><span class="al">###</span></span>
-<span id="cb18-27"><a href="#cb18-27" tabindex="-1"></a>  </span>
-<span id="cb18-28"><a href="#cb18-28" tabindex="-1"></a>  <span class="co"># Predict using OLS model with transformed testing data</span></span>
-<span id="cb18-29"><a href="#cb18-29" tabindex="-1"></a>  yhat_fold <span class="ot">&lt;-</span> <span class="do">### --- ??? --- </span><span class="al">###</span></span>
-<span id="cb18-30"><a href="#cb18-30" tabindex="-1"></a>    </span>
-<span id="cb18-31"><a href="#cb18-31" tabindex="-1"></a>  <span class="co"># Allocate those predicted values into the corresponding fold</span></span>
-<span id="cb18-32"><a href="#cb18-32" tabindex="-1"></a>  yhat_cv[test_id] <span class="ot">&lt;-</span> yhat_fold</span>
-<span id="cb18-33"><a href="#cb18-33" tabindex="-1"></a>  </span>
-<span id="cb18-34"><a href="#cb18-34" tabindex="-1"></a>}</span>
-<span id="cb18-35"><a href="#cb18-35" tabindex="-1"></a><span class="co"># Compute MSE of the cross-validation</span></span>
-<span id="cb18-36"><a href="#cb18-36" tabindex="-1"></a>mse_cv <span class="ot">&lt;-</span> <span class="fu">mean</span>((y <span class="sc">-</span> yhat_cv)<span class="sc">^</span><span class="dv">2</span>)</span>
-<span id="cb18-37"><a href="#cb18-37" tabindex="-1"></a><span class="fu">print</span>(mse_cv) </span></code></pre></div>
-<pre><code>## [1] 65982.34</code></pre>
+<div class="sourceCode" id="cb24"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb24-1"><a href="#cb24-1" tabindex="-1"></a><span class="co"># Create empty vector for storing predicted values</span></span>
+<span id="cb24-2"><a href="#cb24-2" tabindex="-1"></a>yhat_cv <span class="ot">&lt;-</span> <span class="fu">numeric</span>(<span class="fu">length</span>(y))</span>
+<span id="cb24-3"><a href="#cb24-3" tabindex="-1"></a></span>
+<span id="cb24-4"><a href="#cb24-4" tabindex="-1"></a><span class="co"># Start 10-fold CV</span></span>
+<span id="cb24-5"><a href="#cb24-5" tabindex="-1"></a><span class="cf">for</span> (k <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span>nfold) {</span>
+<span id="cb24-6"><a href="#cb24-6" tabindex="-1"></a>  <span class="co"># Prepare training data</span></span>
+<span id="cb24-7"><a href="#cb24-7" tabindex="-1"></a>  train_id <span class="ot">&lt;-</span> <span class="fu">which</span>(folds <span class="sc">!=</span> k)</span>
+<span id="cb24-8"><a href="#cb24-8" tabindex="-1"></a>  train_x <span class="ot">&lt;-</span> modelmat[train_id,]</span>
+<span id="cb24-9"><a href="#cb24-9" tabindex="-1"></a>  train_y <span class="ot">&lt;-</span> y[train_id]</span>
+<span id="cb24-10"><a href="#cb24-10" tabindex="-1"></a>  </span>
+<span id="cb24-11"><a href="#cb24-11" tabindex="-1"></a>  <span class="co"># Transform the data into PCs with cumulated variance exceeding 90%</span></span>
+<span id="cb24-12"><a href="#cb24-12" tabindex="-1"></a>  <span class="do">### --- ??? --- </span><span class="al">###</span></span>
+<span id="cb24-13"><a href="#cb24-13" tabindex="-1"></a>  </span>
+<span id="cb24-14"><a href="#cb24-14" tabindex="-1"></a>  <span class="co"># Fit OLS model for the transformed data</span></span>
+<span id="cb24-15"><a href="#cb24-15" tabindex="-1"></a>  pcr_fold <span class="ot">&lt;-</span> <span class="fu">glmnet</span>(<span class="do">### --- ??? --- </span><span class="al">###</span></span>
+<span id="cb24-16"><a href="#cb24-16" tabindex="-1"></a>                     , y, <span class="at">family =</span> <span class="st">&quot;gaussian&quot;</span>, <span class="at">alpha =</span> <span class="dv">0</span>, <span class="at">lambda =</span> <span class="dv">0</span>)</span>
+<span id="cb24-17"><a href="#cb24-17" tabindex="-1"></a>  </span>
+<span id="cb24-18"><a href="#cb24-18" tabindex="-1"></a>  <span class="co"># Prepare the testing data</span></span>
+<span id="cb24-19"><a href="#cb24-19" tabindex="-1"></a>  test_id <span class="ot">&lt;-</span> <span class="fu">which</span>(folds <span class="sc">==</span> k)</span>
+<span id="cb24-20"><a href="#cb24-20" tabindex="-1"></a>  test_x <span class="ot">&lt;-</span> modelmat[test_id,]</span>
+<span id="cb24-21"><a href="#cb24-21" tabindex="-1"></a>  </span>
+<span id="cb24-22"><a href="#cb24-22" tabindex="-1"></a>  <span class="co"># Standardize the testing data using center and scale parameters of the training data</span></span>
+<span id="cb24-23"><a href="#cb24-23" tabindex="-1"></a>  <span class="do">### --- ??? --- </span><span class="al">###</span></span>
+<span id="cb24-24"><a href="#cb24-24" tabindex="-1"></a>  </span>
+<span id="cb24-25"><a href="#cb24-25" tabindex="-1"></a>  <span class="co"># Rotate the standardized testing data using trained PCA coordinates</span></span>
+<span id="cb24-26"><a href="#cb24-26" tabindex="-1"></a>  <span class="do">### --- ??? --- </span><span class="al">###</span></span>
+<span id="cb24-27"><a href="#cb24-27" tabindex="-1"></a>  </span>
+<span id="cb24-28"><a href="#cb24-28" tabindex="-1"></a>  <span class="co"># Predict using OLS model with transformed testing data</span></span>
+<span id="cb24-29"><a href="#cb24-29" tabindex="-1"></a>  yhat_fold <span class="ot">&lt;-</span> <span class="do">### --- ??? --- </span><span class="al">###</span></span>
+<span id="cb24-30"><a href="#cb24-30" tabindex="-1"></a>    </span>
+<span id="cb24-31"><a href="#cb24-31" tabindex="-1"></a>  <span class="co"># Allocate those predicted values into the corresponding fold</span></span>
+<span id="cb24-32"><a href="#cb24-32" tabindex="-1"></a>  yhat_cv[test_id] <span class="ot">&lt;-</span> yhat_fold</span>
+<span id="cb24-33"><a href="#cb24-33" tabindex="-1"></a>  </span>
+<span id="cb24-34"><a href="#cb24-34" tabindex="-1"></a>}</span>
+<span id="cb24-35"><a href="#cb24-35" tabindex="-1"></a><span class="co"># Compute MSE of the cross-validation</span></span>
+<span id="cb24-36"><a href="#cb24-36" tabindex="-1"></a>mse_cv <span class="ot">&lt;-</span> <span class="fu">mean</span>((y <span class="sc">-</span> yhat_cv)<span class="sc">^</span><span class="dv">2</span>)</span>
+<span id="cb24-37"><a href="#cb24-37" tabindex="-1"></a><span class="fu">print</span>(mse_cv) </span></code></pre></div>
+<pre><code>## [1] 69966.15</code></pre>
 </div>
 </div>
 </div>
