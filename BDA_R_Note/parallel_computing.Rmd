@@ -1,0 +1,52 @@
+---
+title: "Parallel Computing in R"
+output:
+  prettydoc::html_pretty:
+    theme: tactile 
+    highlight: github
+    math: katex
+    toc: true
+    self-contained: true
+#date: "2025-03-11"
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# 優化程式碼
+
+```{r}
+# 輸出矩陣每列的最大值
+n <- 1e7
+p <- 10
+A <- matrix(runif(n*p, 0, 1), n, p)
+
+t1 <- system.time({
+  res1 <- numeric(n)
+  for (i in 1:n) {
+    res1[i] <- max(A[i,])
+  }
+})[3]
+print(t1)
+
+t2 <- system.time({
+  res2 <- sapply(seq(n), 
+    function(i) max(A[i,])
+  )
+})[3]
+print(t2)
+
+library(matrixStats)
+t3 <- system.time({
+  res3 <- rowOrderStats(
+    A, which = p)
+})[3]
+print(t3)
+
+t4 <- system.time({
+  res4 <- A[cbind(1:n, max.col(A))]
+})[3]
+print(t4)
+```
