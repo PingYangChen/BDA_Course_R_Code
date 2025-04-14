@@ -1,0 +1,412 @@
+---
+title: "Model Validation for Categorical Response and dealing with Imbalanced Data"
+author: "Ping-Yang Chen"
+output:
+  prettydoc::html_pretty:
+    theme: tactile 
+    highlight: github
+    math: katex
+    toc: true
+    self-contained: true
+#date: "2024-03-26"
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r instPkg, each = TRUE, eval = FALSE}
+install.packages(c("ggplot2", "GGally", "cvms", "tibble", "glmnet", "smotefamily", "pracma"))
+```
+
+# Model Validation for Categorical Response
+
+以信用卡違約記錄資料作為範例，讀取資料並整理成迴歸分析所需格式。針對類別型變數，在 R 中請自行將欄位更改為 `factor` 型態。
+
+```{r creDfRead, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
+defUrl <- 'https://raw.githubusercontent.com/PingYangChen/BDA_Course_R_Code/refs/heads/main/sample_data/Default.csv'
+defDf <- read.csv(defUrl)
+defDf$default <- as.factor(defDf$default)
+defDf$student <- as.factor(defDf$student)
+```
+
+大略檢視前 6 筆資料
+
+```{r, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
+head(defDf, 6)
+```
+作圖快速檢視資料各變數的分佈形態，以及變數之間的關聯與差異。圖中顯示解釋變數 `balance` 在反應變數 `default` 不同時有數值分布上的差異，且兩個解釋變數
+`balance` 與 `income` 之間有一個低度負相關。
+
+```{r plotDefault1, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE, fig.align='center', fig.width = 7, fig.height = 7}
+library(GGally)
+ggpairs(defDf, aes(colour = "firebrick", alpha = 0.4))
+```
+<!--
+```{r plotDefault2, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE, fig.align='center', fig.width = 8.5, fig.height = 3}
+library(ggplot2)
+library(gridExtra)
+p1 <- ggplot(defDf) +
+  geom_point(aes(x = balance, y = income, color = default), alpha = 0.5) +
+  labs(x = "balance", y = "income")
+p2 <- ggplot(defDf) +
+  geom_boxplot( aes(x = default, y = balance, fill = default)) +
+  labs(y = "balance")
+p3 <- ggplot(defDf) +
+  geom_boxplot( aes(x = default, y = income, fill = default)) +
+  labs(y = "income")
+grid.arrange(p1, p2, p3, nrow = 1, widths = c(2, 1, 1))
+```
+-->
+
+以下使用 Logistic regression 分析信用卡違約記錄資料，同上一篇，在此也使用 **glmnet** 套件。
+
+```{r loadglmnet, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
+library(glmnet)
+```
+
+先將資料整理成 `glmnet` 所需格式：`model.matrix`。
+
+- 反應變數可直接從資料中擷取，並轉成 `0`、`1` 二元數字。
+- 解釋變數則透過 `model.matrix` 函數與 R 模型語法快速整理**（記得刪除截距項）**。
+
+```{r defDfModelMat, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
+# Create the Binary Response Variable
+y <- as.numeric(defDf$default) - 1
+# Create model matrix
+modelmat <- model.matrix(default ~ ., data = defDf)[,-1] # Remove intercept part
+```
+
+以 `glmnet` 建立 Logistic regression model，並透過 `predict` 計算模型配適值。
+
+```{r fitGLM, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
+# fit logistic regression model
+glm_fit <- glmnet(modelmat, y, family = "binomial", alpha = 0, lambda = 0)
+y_fit <- (predict(glm_fit, modelmat, type = "response") > 0.5)
+```
+
+## Confusion Matrix Definition
+
+自行定義混淆矩陣函數（[參考資料](https://en.wikipedia.org/wiki/Receiver_operating_characteristic)）
+
+多併一組 `uniqueY` 再數數量，確保每個類別都至少有 1 個
+最後將多數的 1 扣掉，讓 table 能輸出所有類別的計數 (包含 0)
+```{r}
+confusion <- function(trueY, predY) {
+  uniqueY <- unique(trueY)
+  ncateg <- length(uniqueY)
+  confmat <- matrix(0, ncateg, ncateg)
+  for (i in 1:ncateg) {
+    loc <- which(trueY == uniqueY[i])
+    # 多併一組 uniqueY 再屬數量，確保每個類別都至少有 1 個
+    # 最後將多數的 1 扣掉，讓 table 能輸出所有類別的計數 (包含 0)
+    pred_count <- table(c(predY[loc], uniqueY)) - 1
+    confmat[i,] <- pred_count
+  }
+  confmat <- as.table(confmat)
+  dimnames(confmat) <- list("target" = uniqueY, "prediction" = uniqueY)
+  return(confmat)
+}
+```
+
+
+計算模型配適的分類表現
+
+```{r loadtibble, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
+library(tibble)
+library(cvms)
+```
+
+```{r fitGLMSeeResult, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
+# Compute Confusion Matrix
+confmat <- confusion(y, y_fit)
+print(confmat)
+# Calculate Classification Rates
+acc <- 100*sum(diag(confmat))/sum(confmat)
+tpr <- 100*confmat[2,2]/sum(confmat[2,])
+tnr <- 100*confmat[1,1]/sum(confmat[1,])
+print(data.frame(ACC = acc, TPR = tpr, TNR = tnr))
+```
+
+另外，套件 **cvms** 及 **tibble** 可用於視覺化混淆矩陣
+```{r cmVis, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE, fig.align='center', fig.width=8, fig.height=5}
+library(cvms)
+library(tibble)
+plot_confusion_matrix(as_tibble(confmat),
+                      target_col = "target", 
+                      prediction_col = "prediction",
+                      counts_col = "n")
+```
+
+## Cross-validation for Classification Model
+
+交互驗證的方式與上一篇類似，差別只在於結果檢視與模型預測表現以混淆矩陣計算
+
+```{r loadpracma, eval=TRUE, echo=TRUE, message=FALSE, warning=FALSE}
+# Make CV-folds by yourself
+library(pracma)
+```
+
+1. 切分訓練測試集（思考可以精進的方式）
+
+```{r splitDataGLM, eval=TRUE, echo=TRUE, message=FALSE, warning=FALSE}
+# Implement 10-fold CV
+n <- length(y)
+nfold <- 10 # set number of folds
+# Always remember to set seed before actions with randomness involved!!
+seed <- 1
+set.seed(seed)
+# Create belonging folds for each data point
+# by randomly permuting the index of folds.
+folds <- pracma::randperm( 
+  rep(1:nfold, time = ceiling(n/nfold))[1:n]
+)
+# View the distribution of testing data sizes in each fold
+table(folds)
+```
+
+2. 執行交互驗證
+
+```{r cvGLM, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
+# Create space for storing predicted values of 10-fold CV 
+y_cv <- numeric(n)
+# Start 10-fold CV
+for (k in 1:nfold) {
+  # Get data id for training and testing
+  train_id <- which(folds != k)
+  test_id <- which(folds == k)
+  # Get training data (X and y)
+  train_x <- modelmat[train_id,]
+  train_y <- y[train_id]
+  # Get testing data (X)
+  test_x <- modelmat[test_id,]
+  test_y <- y[test_id]
+  # Fit Logistic model with training data
+  lm_fold <- glmnet(train_x, train_y, family = "binomial", alpha = 0, lambda = 0)
+  # Get prediction of the testing data
+  yhat_fold <- (predict(lm_fold, test_x, type = "response") > 0.5)
+  # Allocate those predicted values into the corresponding fold
+  y_cv[test_id] <- yhat_fold
+}
+```
+
+3. 計算交互驗證下的模型分類表現
+
+```{r cvGLMSeeResult, eval=TRUE, echo=TRUE, message=FALSE, warning=FALSE, fig.align='center', fig.width=8, fig.height=5}
+# Compute Confusion Matrix
+confmat_cv <- confusion(y, y_cv)
+print(confmat_cv)
+# Calculate Classification Rates
+acc_cv <- 100*sum(diag(confmat_cv))/sum(confmat_cv)
+tpr_cv <- 100*confmat_cv[2,2]/sum(confmat_cv[2,])
+tnr_cv <- 100*confmat_cv[1,1]/sum(confmat_cv[1,])
+print(data.frame(ACC = acc_cv, TPR = tpr_cv, TNR = tnr_cv))
+```
+
+
+# Handling Imbalanced Data
+
+本文使用的信用卡違約記錄資料為不平衡資料，這種資料常見的問題包含
+
+- 分類器的 TPR 過低
+- 隨機切分資料進行交互驗證時，可能導致某一組訓練資料只包含一種分類的資料（**如何避免？**）
+
+<!--
+```{r countDataImbal, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
+table(defDf$default)
+```
+-->
+
+```{r plotDataImbal, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE, fig.align='center', fig.width = 5, fig.height = 5}
+plot(defDf$default, ylab = "Count", xlab = "default", main = "Counts of the Default Labels")
+```
+
+本文介紹常用的不平衡資料處理方法：
+
+1. 建模後：控制分類器決策
+2. 建模時：考慮類別權重
+3. 建模前：資料重抽樣
+
+## Cutoff Manipulation
+
+以二元 Logistic regression model 為例，模型假設 $Y\sim Ber(\mu)$，此機率為解釋變數線性組合的 inverse-logit 轉換
+$$
+\mu=P(Y = 1\mid \mathbf{X} = \mathbf{x}) = \frac{\exp{\{\mathbf{x}^\top\boldsymbol{\beta}\}}}{1+\exp{\{\mathbf{x}^\top\boldsymbol{\beta}\}}}
+$$
+
+實務上，若要判斷所輸入的測試資料 $\mathbf{x}$ 對應的類別 $\hat{Y}$，仍須主觀地給予模型輸出機率值一個分類門檻（cutoff）
+
+$$
+\hat{Y} = I\left[\hat{P}(Y = 1\mid \mathbf{X} = \mathbf{x}) > C \right]
+$$
+一般而言，若無任何主觀意見，通常設定 $C = 0.5$，但此未必是最合適（讓模型分類表現最佳）的門檻值。
+
+若要找最合適的門檻值，可以嘗試多種 cutoff 設定，並記錄不同 cutoff 之下的 true positive rate（TPR）及 false positive rate（FPR），繪製 receiver operating characteristic（ROC）曲線，找到最能平衡 TPR 及 FPR 的最佳 cutoff。
+
+另一種方式是，在不同 cutoff 設定之下，計算由 TPR 及 FPR 衍生的總合指標，例如 F1-score $$F_1 = \frac{2TP}{2TP + FP + FN}$$，挑出使 F1-score 最高的 cutoff。
+
+```{r setCutoffs, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
+cutoffs <- seq(0, 1, length = 101)
+```
+
+
+```{r calcROC, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
+# fit logistic regression model
+glm_fit <- glmnet(modelmat, y, family = "binomial", alpha = 0, lambda = 0)
+# Create space for storing FPR, TPR and F1 score
+scoreMat <- matrix(0, length(cutoffs), 3)
+colnames(scoreMat) <- c("FPR", "TPR", "F1")
+# Run for each cutoff and calculate the corresponding FPR, TPR and F1 score
+for (i in 1:length(cutoffs)) {
+  y_glm <- (predict(glm_fit, modelmat, type = "response") > cutoffs[i])
+  # Compute Accuracy using confusion matrix
+  cm_glm <- confusion(y, y_glm)
+  tpr_glm <- 100*cm_glm[2,2]/sum(cm_glm[2,])
+  fpr_glm <- 100 - 100*cm_glm[1,1]/sum(cm_glm[1,])
+  f1_glm <- 2*cm_glm[2,2]/(2*cm_glm[2,2] + cm_glm[1,2] + cm_glm[2,1])
+  scoreMat[i,] <- c(fpr_glm, tpr_glm, f1_glm)
+}
+```
+
+
+繪製 receiver operating characteristic （ROC）曲線。一般而言，選擇靠近 ROC 曲線左上緣的 cutoff，但仍存在分析者的主觀認定。
+
+```{r drawROC, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE, fig.align='center', fig.width = 8, fig.height = 6}
+plot(scoreMat[,1:2], type = "l", lwd = 2, ylim = c(-.5, 105), col = "#555555",
+     ylab = "True Positive Rate", xlab = "False Positive Rate", main = "ROC Curve")
+for (k in c(2, 11, 26, 51, 76, 91, which.max(scoreMat[,3]))) {
+  points(scoreMat[k,1], scoreMat[k,2], pch = 16)
+  if (k == 2) { tpos = 3 } else { tpos = 4 }
+  text(scoreMat[k,1], scoreMat[k,2], 
+       sprintf("Cutoff = %.2f, FPR = %.2f, TPR = %.2f", 
+               cutoffs[k], scoreMat[k,1], scoreMat[k,2]),
+       pos = tpos)
+}
+```
+
+繪製 cutoff vs. F1-score 曲線。較直接，可選擇對應 F1-score 最高的 cutoff。
+
+```{r drawF1, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE, fig.align='center', fig.width = 8, fig.height = 5}
+plot(cutoffs, scoreMat[,3], type = "l", lwd = 2, col = "#555555", xlab = "Cutoff", ylab = "F1-score")
+points(cutoffs[which.max(scoreMat[,3])], max(scoreMat[,3]), pch = 16, col = "firebrick")
+text(cutoffs[which.max(scoreMat[,3])], max(scoreMat[,3]),
+     sprintf("   Cutoff = %.2f, F1 = %.2f", cutoffs[which.max(scoreMat[,3])], max(scoreMat[,3])),
+     col = "firebrick", pos = 4)
+```
+
+
+計算最佳 F1-score 對應的 Cutoff 於模型配適的分類表現
+
+```{r cutoffGLMSeeResult, eval=TRUE, echo=TRUE, message=FALSE, warning=FALSE, fig.align='center', fig.width=8, fig.height=5}
+mc_y_glm <- (predict(glm_fit, modelmat, type = "response") > cutoffs[which.max(scoreMat[,3])])
+
+# Compute Confusion Matrix
+confmat_mc <- confusion(y, mc_y_glm)
+print(confmat_mc)
+# Calculate Classification Rates
+acc_mc <- 100*sum(diag(confmat_mc))/sum(confmat_mc)
+tpr_mc <- 100*confmat_mc[2,2]/sum(confmat_mc[2,])
+tnr_mc <- 100*confmat_mc[1,1]/sum(confmat_mc[1,])
+print(data.frame(ACC = acc_mc, TPR = tpr_mc, TNR = tnr_mc))
+```
+
+
+
+## Weighted Logistic Regression
+
+第二種方式是在建模時，於 loss function（objective function）中加入類別權重，使得模型建立時，讓少數類別被分類錯誤的 loss 加重，迫使模型估計偏向加強對少數類別的分類準確性，做法如下。
+
+建立權重，給予少數類別較大的權重，多數類別較小的權重
+```{r calcWeight, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
+# Create the weight vector based on the distribution of the binary response
+wt <- numeric(length(y))
+wt[y == 0] <- 1 - sum(1 - y)/length(y)
+wt[y == 1] <- 1 - sum(y)/length(y)
+```
+
+
+以二元 Weighted logistic regression model 為例，使用 `glmnet` 透過設定 `weights = wt` 加入權重建立模型，並透過 `predict` 計算模型配適值。
+```{r fitWGLM, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
+# fit logistic regression model
+wglm_fit <- glmnet(modelmat, y, family = "binomial", 
+                   alpha = 0, lambda = 0, weights = wt)
+y_wglm <- (predict(wglm_fit, modelmat, type = "response") > 0.5)
+```
+
+計算模型配適的分類表現
+
+```{r fitWGLMSeeResult, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE, fig.align='center', fig.width=8, fig.height=5}
+# Compute Confusion Matrix
+cm_wglm <- confusion(y, y_wglm)
+print(cm_wglm)
+# Calculate Classification Rates
+acc_wglm <- 100*sum(diag(cm_wglm))/sum(cm_wglm)
+tpr_wglm <- 100*cm_wglm[2,2]/sum(cm_wglm[2,])
+tnr_wglm <- 100*cm_wglm[1,1]/sum(cm_wglm[1,])
+print(data.frame(ACC = acc_wglm, TPR = tpr_wglm, TNR = tnr_wglm))
+```
+
+
+
+## Synthesized Minority Oversampling Technique (SMOTE)
+
+在建模前處理資料不平衡問題，可進行資料重抽樣，常用的手法包含 up-sampling 及 down-sampling，以及較為整合應用之 SMOTE 方法。在 R 中，可使用套件 **smotefamily** 來執行資料重抽樣。
+
+```{r loadsmote, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
+library(smotefamily)
+```
+
+使用基本 `SMOTE` 方法做為範例，輸入 model matrix 及反應變數
+
+```{r useSMOTE, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
+# Use SMOTE for for Imbalanced Data
+defDfSmoteObj <- SMOTE(data.frame(modelmat), y)
+nrow(defDfSmoteObj$data)
+```
+
+可見 `SMOTE` 將資料擴增為 `r nrow(defDfSmoteObj$data)` 筆，相較於原始資料多出 `r nrow(defDfSmoteObj$data) - nrow(defDf)` 筆。再將重抽樣的資料整理成 `glmnet` 須要的輸入格式。
+
+```{r getSMOTEData, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
+# Remove the final response column 'class' generated by SMTOE
+modelmat_smote <- as.matrix(defDfSmoteObj$data[,-ncol(defDfSmoteObj$data)])
+# Transfer format for the response column 'class'
+y_smote <- as.numeric(defDfSmoteObj$data$class)
+```
+
+輸入 **SMOTE 重抽樣資料**，以 `glmnet` 建立 Logistic regression model。於計算模型配適值時，輸入**原始資料**，透過 `predict` 輸出即可。
+
+```{r fitSMOTEGLM, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
+# fit logistic regression model
+smote_glm_fit <- glmnet(modelmat_smote, y_smote, family = "binomial", 
+                        alpha = 0, lambda = 0)
+smote_y_glm <- (predict(smote_glm_fit, modelmat, type = "response") > 0.5)
+```
+
+計算模型配適的分類表現
+
+```{r fitSMOTEGLMSeeResult, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE, fig.align='center', fig.width=8, fig.height=5}
+# Compute Confusion Matrix
+rs_cm_glm <- confusion(y, smote_y_glm)
+print(rs_cm_glm)
+# Calculate Classification Rates
+rs_acc <- 100*sum(diag(rs_cm_glm))/sum(rs_cm_glm)
+rs_tpr <- 100*rs_cm_glm[2,2]/sum(rs_cm_glm[2,])
+rs_tnr <- 100*rs_cm_glm[1,1]/sum(rs_cm_glm[1,])
+print(data.frame(ACC = rs_acc, TPR = rs_tpr, TNR = rs_tnr))
+```
+
+
+# Concluding Remarks
+
+整理本篇所介紹各方法的模型配適分類表現（交互驗證之結果可自行驗證）
+
+```{r}
+methodSummary <- data.frame(
+  ACC = c(acc, acc_mc, acc_wglm, rs_acc), 
+  TPR = c(tpr, tpr_mc, tpr_wglm, rs_tpr), 
+  TNR = c(tnr, tnr_mc, tnr_wglm, rs_tnr)
+)
+rownames(methodSummary) <- c("GLM", "Best F1", "WGLM", "SMOTE-GLM")
+print(methodSummary)
+```

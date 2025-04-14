@@ -50,3 +50,123 @@ t4 <- system.time({
 })[3]
 print(t4)
 ```
+
+
+
+
+以信用卡資料作為範例，讀取資料並整理成迴歸分析所需格式
+
+```{r creDfRead, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
+creUrl <- 'https://raw.githubusercontent.com/PingYangChen/BDA_Course_R_Code/refs/heads/main/sample_data/Credit.csv'
+creDf <- read.csv(creUrl)
+```
+
+針對類別型變數，在 R 中請自行將欄位更改為 `factor` 型態。
+```{r creDfSetProp, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
+creDf$Own <- as.factor(creDf$Own)
+creDf$Student <- as.factor(creDf$Student)
+creDf$Married <- as.factor(creDf$Married)
+creDf$Region <- as.factor(creDf$Region)
+```
+
+
+先將資料整理成 `glmnet` 所需格式：`model.matrix`。
+
+- 反應變數可直接從資料中擷取。
+- 解釋變數則透過 `model.matrix` 函數與 R 模型語法快速整理**（記得刪除截距項）**。
+
+```{r creDfModelMat, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
+# Create Response Variable
+y <- creDf$Balance
+# Create model matrix
+modelmat <- model.matrix(Balance ~ ., data = creDf)[,-1] # Remove intercept part
+```
+
+
+試建立 Elastic Net Regression，並計算模型配適值的誤差（MSE）。
+
+```{r loadglmnet, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
+library(glmnet)
+```
+
+
+
+1. 準備超參數集
+
+```{r setHyper, eval=TRUE, echo=TRUE, message=FALSE, warning=FALSE}
+# tuning sets of alpha and lambda
+alpha_set <- c(0.3, 0.5, 0.7)
+lambda_set <- exp(seq(-3, 1, length = 50))
+# create a 150x2 matrix of all candidates of alpha and lambda values
+param_cand <- cbind(
+  rep(alpha_set, time = length(lambda_set)),
+  rep(lambda_set, each = length(alpha_set))
+)
+# Create space for storing MSE values of all parameter candidates
+mse_cv_tune <- numeric(nrow(param_cand))
+```
+
+2. 切分訓練測試集
+
+```{r loadpracma, eval=TRUE, echo=TRUE, message=FALSE, warning=FALSE}
+# Make CV-folds by yourself
+library(pracma)
+```
+
+```{r splitDataEN, eval=TRUE, echo=TRUE, message=FALSE, warning=FALSE}
+# Implement 10-fold CV
+n <- length(y)
+nfold <- 10 # set number of folds
+# Always remember to set seed before actions with randomness involved!!
+seed <- 1
+set.seed(seed)
+# Create belonging folds for each data point
+# by randomly permuting the index of folds.
+folds <- pracma::randperm( 
+  rep(1:nfold, time = ceiling(n/nfold))[1:n]
+)
+# View the distribution of testing data sizes in each fold
+table(folds)
+```
+
+
+
+
+```{r}
+
+# 開啟平行核心數
+cl = makeCluster(4)
+registerDoParallel(cl)
+cv_time_par <- system.time({
+  xp = foreach (i = 1:nrow(param_cand), .combine = 'c', .packages = "glmnet") %dopar% {
+    # Create space for storing predicted values of 10-fold CV 
+    y_cv <- numeric(n)
+    # Start 10-fold CV
+    for (k in 1:nfold) {
+      # Get data id for training and testing
+      train_id <- which(folds != k)
+      test_id <- which(folds == k)
+      # Get training data (X and y)
+      train_x <- modelmat[train_id,]
+      train_y <- y[train_id]
+      # Get testing data (X only)
+      test_x <- modelmat[test_id,]
+      # Fit OLS model with training data
+      en_fold <- glmnet(train_x, train_y, family = "gaussian", 
+                        alpha = param_cand[ipar,1], lambda = param_cand[ipar,2])
+      # Get prediction of the testing data
+      yhat_fold <- predict(en_fold, test_x)
+      # Allocate those predicted values into the corresponding fold
+      y_cv[test_id] <- yhat_fold
+    }
+    # Compute MSE of the cross-validation
+    mse_cv <- mean((y - y_cv)^2)
+    mse_cv
+  }
+})[3]
+# 關閉平行核心數
+stopCluster(cl)
+
+
+print(cv_time_par)
+```
