@@ -15,54 +15,207 @@ output:
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-# 優化程式碼
+請先安裝本篇需要的 R 套件
+```{r instPkg, each = TRUE, eval = FALSE, message=FALSE, warning=FALSE}
+install.packages(c("matrixStats", "foreach", "doParallel", "glmnet", "pracma"))
+```
 
-```{r} 
-# 輸出矩陣每列的最大值
-n <- 1e7
-p <- 10
-A <- matrix(runif(n*p, 0, 1), n, p)
 
+# Tracking Computing Time 
+
+進行大量運算時，保持好習慣紀錄下執行程式的時間，以便未來評估：
+
+- 若要再執行一次，需要多久？
+- 是否還有優化程式碼的空間？
+
+在 R 中，最基本的運算時間紀錄方式如下範例，使用 `system.time` 將程式碼包起來，並在執行完成後，檢視輸出時間的第 3 項 `elapse`。
+```{r exampleCPUTime, echo=TRUE, eval=FALSE, message=FALSE, warning=FALSE}
+cputime <- system.time({
+
+  ... # codes to evaluate computing time
+
+})[3] # seconds
+```
+
+
+以下用個簡單的範例來說明：**輸出大型整數矩陣每列的最大值**
+
+```{r createLargeMatrix, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE} 
+n <- 1e7 # nrows
+p <- 10  # ncols
+set.seed(1)
+A <- matrix(sample(-1e6:1e6, n*p, replace = TRUE), n, p)
+```
+
+最直接的想法為使用 `for` 迴圈，以 `max()` 函數逐列計算各列的最大值
+
+```{r t1, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE} 
 t1 <- system.time({
   res1 <- numeric(n)
   for (i in 1:n) {
     res1[i] <- max(A[i,])
   }
 })[3]
-print(t1)
+sprintf("Method 1 CPU time: %.2f Seconds", t1)
+```
 
+為了簡化程式碼，可以改用 R 的 `apply` 系列函數
+
+```{r t2, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE} 
 t2 <- system.time({
-  res2 <- sapply(seq(n), 
-    function(i) max(A[i,])
-  )
+  res2 <- sapply(seq(n), function(i) max(A[i,]))
 })[3]
-print(t2)
+sprintf("Method 3 CPU time: %.2f Seconds", t2)
+```
 
+對於矩陣運算，可使用套件 **matrixStats** 內的功能 
+
+```{r t3, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE} 
 library(matrixStats)
 t3 <- system.time({
-  res3 <- rowOrderStats(
-    A, which = p)
+  res3 <- rowOrderStats(A, which = p)
 })[3]
-print(t3)
+sprintf("Method 3 CPU time: %.2f Seconds", t3)
+```
 
+若熟悉矩陣排列 indexing，以下方法可能是計算速度最快的
+
+```{r t4, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE} 
 t4 <- system.time({
   res4 <- A[cbind(1:n, max.col(A))]
 })[3]
-print(t4)
+sprintf("Method 4 CPU time: %.2f Seconds", t4)
+```
+
+確認四個結果皆一致
+
+```{r tvali, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
+all((res1 - res2) == 0) & all((res1 - res3) == 0) & all((res1 - res4) == 0) 
+```
+
+# Parallel Computing in R
+
+本篇以較容易上手的 **foreach** 與 **doParallel** 套件說明在 R 中的平行運算
+
+```{r loadParallel, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
+library(foreach)
+library(doParallel)
+```
+
+## Basic Concept of Parallelism 
+
+使用平行運算之前，首先透過 `detectCores()` 確認自己的主機有多少執行緒（threads）可供平行運算使用。
+
+```{r nCores, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
+detectCores(logical = TRUE)
+```
+
+以 16 核心的 [Intel(R) Core(TM) i7-13700 2.10 GHz CPU](https://www.intel.com/content/www/us/en/products/sku/230490/intel-core-i713700-processor-30m-cache-up-to-5-20-ghz/specifications.html) 為例，總共有 `detectCores(logical = TRUE)` 執行緒（threads）可供平行運算使用。
+
+一般而言，不建議將全部執行緒一次用在同一個平行運算任務（建議用總執行緒數的一半）。
+使用 **foreach** 執行平行運算，基本程式框架如下：
+
+1. 指定負責平行運算的執行緒數量，以 `makeCluster` 啟動 Cluster
+2. 將創建的 Cluster，以 `registerDoParallel` 註冊
+3. 開始計時運算時間
+4. 將 `for` 迴圈，改為 `foreach` `%dopar%` 迴圈，並指定平行輸出結果至新變數 `result` (自行命名)。
+  - `.combine`：如何組合平行任務輸出的結果（如 `c`, `cbind`, `rbind`, `list`）
+  - `.packages`：平行任務中需要引用的 R 套件（如 `"glmnet"`）
+5. 結束計時運算時間
+6. **關閉 Cluster 註冊**（極重要!!!）
+
+```{r exampleParallelStruct, echo=TRUE, eval=FALSE, message=FALSE, warning=FALSE}
+nThreads <- 4
+cl = makeCluster(nThreads)  # initialize parallel cluster with
+registerDoParallel(cl) # sets up the cluster for the foreach loop
+cputime <- system.time({
+
+  result <- foreach (i = 1:n_tasks, .combine = AAA, .packages = BBB) %dopar% { 
+    
+    ... # codes of parallelized task
+
+  }
+
+})[3] # seconds
+stopCluster(cl) # IMPORTANT! shutdown parallel cluster
 ```
 
 
+範例為執行 6 個空任務，每個任務只輸出當下執行的 Process ID，先看一般使用 `for` 迴圈的版本，可發現 6 個任務皆由同一個 Process ID 執行。
+
+```{r printTIDSerial, echo=TRUE, eval=TRUE, message=TRUE, warning=TRUE}
+for (i in 1:6) { 
+  pid <- Sys.getpid()
+  print(sprintf("Task %d is running in process %d", i, pid))
+}
+```
+
+講同樣的 6 個空任務，指派給 4 個執行緒進行平行運算，將程式修改如下，可看到 6 個任務由不同 Process ID 執行。
+```{r printTID, echo=TRUE, eval=TRUE, message=TRUE, warning=TRUE}
+cl <- makeCluster(4)
+registerDoParallel(cl)
+foreach (i = 1:6) %dopar% { 
+  pid <- Sys.getpid()
+  print(sprintf("Task %d is running in process %d", i, pid))
+}
+stopCluster(cl)
+```
+
+## Toy Example: Massive Simple Computation
 
 
-以信用卡資料作為範例，讀取資料並整理成迴歸分析所需格式
+```{r toyVector, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
+# Vector Version
+cputime_vec <- system.time({
+  vector_result <- sqrt(1:20000) 
+})[3]
+sprintf("Vector Version CPU time: %.2f Seconds", cputime_vec)
+```
+
+```{r toySerial, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
+# Serial Version
+serial_result <- numeric(20000)
+cputime_ser <- system.time({
+  for (i in 1:20000) { 
+    serial_result[i] <- sqrt(i) 
+  }
+})[3]
+sprintf("Serial Version CPU time: %.2f Seconds", cputime_ser)
+```
+
+```{r toyParallel, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE} 
+# Parallel Version
+# initialize parallel cluster. Here, we use 4 cores
+cl = makeCluster(4)
+# sets up the cluster for the foreach loop
+registerDoParallel(cl)
+cputime_par <- system.time({
+  result <- foreach (i = 1:20000, .combine = 'c') %dopar% { 
+    sqrt(i)
+  }
+})[3] # seconds
+# shutdown parallel cluster
+stopCluster(cl)
+sprintf("Parallel Version CPU time: %.2f Seconds", cputime_par)
+```
+
+- 使用向量運算的執行時間為 `r sprintf('%.2f', cputime_vec)` 秒
+- 使用一般 `for` 迴圈執行時間為 `r sprintf('%.2f', cputime_ser)` 秒
+- 使用 4 個執行緒平行運算的執行時間為 `r sprintf('%.2f', cputime_par)` 秒（回想課程說明為什麼比較慢？）
+
+
+
+## Cross-validation Tasks in Parameter Tuning
+
+
+回顧模型驗證 `model_vlidation.Rmd` 教材內容，嘗試以平行運算進行模型超參數訓練。
+
+以信用卡資料作為範例，讀取資料並針對類別型變數，在 R 中請自行將欄位更改為 `factor` 型態。
 
 ```{r creDfRead, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
 creUrl <- 'https://raw.githubusercontent.com/PingYangChen/BDA_Course_R_Code/refs/heads/main/sample_data/Credit.csv'
 creDf <- read.csv(creUrl)
-```
-
-針對類別型變數，在 R 中請自行將欄位更改為 `factor` 型態。
-```{r creDfSetProp, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
+# Transform categorical variables as factors
 creDf$Own <- as.factor(creDf$Own)
 creDf$Student <- as.factor(creDf$Student)
 creDf$Married <- as.factor(creDf$Married)
@@ -83,13 +236,7 @@ modelmat <- model.matrix(Balance ~ ., data = creDf)[,-1] # Remove intercept part
 ```
 
 
-試建立 Elastic Net Regression，並計算模型配適值的誤差（MSE）。
-
-```{r loadglmnet, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
-library(glmnet)
-```
-
-
+針對 Elastic Net Regression 的兩種超參數 `alpha` 及 `lambda`，使用交互驗證找出最佳超參數組合。
 
 1. 準備超參數集
 
@@ -102,18 +249,12 @@ param_cand <- cbind(
   rep(alpha_set, time = length(lambda_set)),
   rep(lambda_set, each = length(alpha_set))
 )
-# Create space for storing MSE values of all parameter candidates
-mse_cv_tune <- numeric(nrow(param_cand))
 ```
 
 2. 切分訓練測試集
 
-```{r loadpracma, eval=TRUE, echo=TRUE, message=FALSE, warning=FALSE}
-# Make CV-folds by yourself
-library(pracma)
-```
-
 ```{r splitDataEN, eval=TRUE, echo=TRUE, message=FALSE, warning=FALSE}
+library(pracma)
 # Implement 10-fold CV
 n <- length(y)
 nfold <- 10 # set number of folds
@@ -125,20 +266,66 @@ set.seed(seed)
 folds <- pracma::randperm( 
   rep(1:nfold, time = ceiling(n/nfold))[1:n]
 )
-# View the distribution of testing data sizes in each fold
-table(folds)
+```
+3. 執行交互驗證並計時
+
+```{r ENCVANswer, eval=TRUE, echo=TRUE, message=FALSE, warning=FALSE}
+library(glmnet)
+# Create space for storing MSE values of all parameter candidates
+mse_cv_tune_ser <- numeric(nrow(param_cand))
+
+# Start parameter tuning
+cputime_cv_serial <- system.time({
+  
+  for (ipar in 1:nrow(param_cand)) {
+    # Create empty vector for storing predicted values
+    yhat_cv <- numeric(length(y))
+    # Start 10-fold CV
+    for (k in 1:nfold) {
+      # Prepare training data
+      train_id <- which(folds != k)
+      train_x <- modelmat[train_id,]
+      train_y <- y[train_id]
+      # Fit EN model with training data
+      en_fold <- glmnet(train_x, train_y, family = "gaussian", 
+                        alpha = param_cand[ipar,1], lambda = param_cand[ipar,2])
+      # Prepare testing data
+      test_id <- which(folds == k)
+      test_x <- modelmat[test_id,]
+      # Predict using EN model with testing data
+      yhat_fold <- predict(en_fold, test_x) 
+      # Allocate those predicted values into the corresponding fold
+      yhat_cv[test_id] <- yhat_fold
+    }
+    # Compute MSE of the cross-validation
+    mse_cv <- mean((y - yhat_cv)^2)
+    mse_cv_tune_ser[ipar] <- mse_cv
+  }
+  
+})[3]
 ```
 
+4. 檢視最佳超參數
 
+```{r ENCVView, eval=TRUE, echo=TRUE, message=FALSE, warning=FALSE}
+best_param <- param_cand[which.min(mse_cv_tune_ser),]
+sprintf("Min. CV = %.2f, Best alpha = %.1f, lambda = %f", 
+        min(mse_cv_tune_ser), best_param[1], best_param[2])
+```
 
+5. 檢視計算時間
 
-```{r}
+```{r ENCVTime, eval=TRUE, echo=TRUE, message=FALSE, warning=FALSE}
+sprintf("Serial Cross-validation CPU time: %.2f Seconds", cputime_cv_serial)
+```
 
+```{r ENCVParallel, eval=FALSE, echo=FALSE, message=FALSE, warning=FALSE}
 # 開啟平行核心數
 cl = makeCluster(4)
 registerDoParallel(cl)
-cv_time_par <- system.time({
-  xp = foreach (i = 1:nrow(param_cand), .combine = 'c', .packages = "glmnet") %dopar% {
+cputime_cv_parallel <- system.time({
+  
+  mse_cv_tune_par <- foreach (ipar = 1:nrow(param_cand), .combine = 'c', .packages = "glmnet") %dopar% {
     # Create space for storing predicted values of 10-fold CV 
     y_cv <- numeric(n)
     # Start 10-fold CV
@@ -163,10 +350,28 @@ cv_time_par <- system.time({
     mse_cv <- mean((y - y_cv)^2)
     mse_cv
   }
+  
 })[3]
 # 關閉平行核心數
 stopCluster(cl)
-
-
-print(cv_time_par)
 ```
+
+```{r ENCVParallelView, eval=FALSE, echo=FALSE, message=FALSE, warning=FALSE}
+best_param <- param_cand[which.min(mse_cv_tune_par),]
+sprintf("Min. CV = %.2f, Best alpha = %.1f, lambda = %f", 
+        min(mse_cv_tune_par), best_param[1], best_param[2])
+```
+
+```{r ENCVParallelTime, eval=FALSE, echo=FALSE, message=FALSE, warning=FALSE}
+sprintf("Paralle Cross-validation CPU time: %.2f Seconds", cv_time_par)
+```
+
+## Homework: Parallelizing Cross-validation Tasks in Parameter Tuning
+
+將上節以 cross-validation 挑選最佳 Elastic net regression 超參數的過程平行化
+
+- 需要查出所使用電腦的核心數、執行緒數量
+- 設定執行平行運算的執行緒數量
+- 比較一般 `for` 迴圈運算、平行運算的差異
+  - 結果應該要一致
+  - 比較計算時間
