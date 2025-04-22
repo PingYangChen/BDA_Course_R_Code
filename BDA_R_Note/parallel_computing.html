@@ -209,8 +209,8 @@ Parallelizing Cross-validation Tasks in Parameter Tuning</a></li>
 <p>以下用個簡單的範例來說明：<strong>輸出大型整數矩陣每列的最大值</strong></p>
 <div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a>n <span class="ot">&lt;-</span> <span class="fl">1e7</span> <span class="co"># nrows</span></span>
 <span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a>p <span class="ot">&lt;-</span> <span class="dv">10</span>  <span class="co"># ncols</span></span>
-<span id="cb3-3"><a href="#cb3-3" tabindex="-1"></a><span class="fu">set.seed</span>(<span class="dv">1</span>)</span>
-<span id="cb3-4"><a href="#cb3-4" tabindex="-1"></a>A <span class="ot">&lt;-</span> <span class="fu">matrix</span>(<span class="fu">sample</span>(<span class="sc">-</span><span class="fl">1e6</span><span class="sc">:</span><span class="fl">1e6</span>, n<span class="sc">*</span>p, <span class="at">replace =</span> <span class="cn">TRUE</span>), n, p)</span></code></pre></div>
+<span id="cb3-3"><a href="#cb3-3" tabindex="-1"></a><span class="fu">set.seed</span>(<span class="dv">2025</span>)</span>
+<span id="cb3-4"><a href="#cb3-4" tabindex="-1"></a>A <span class="ot">&lt;-</span> <span class="fu">matrix</span>(<span class="fu">sample</span>(<span class="dv">1</span><span class="sc">:</span><span class="dv">100</span>, n<span class="sc">*</span>p, <span class="at">replace =</span> <span class="cn">TRUE</span>), n, p)</span></code></pre></div>
 <p>最直接的想法為使用 <code>for</code> 迴圈，以 <code>max()</code>
 函數逐列計算各列的最大值</p>
 <div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a>t1 <span class="ot">&lt;-</span> <span class="fu">system.time</span>({</span>
@@ -220,13 +220,13 @@ Parallelizing Cross-validation Tasks in Parameter Tuning</a></li>
 <span id="cb4-5"><a href="#cb4-5" tabindex="-1"></a>  }</span>
 <span id="cb4-6"><a href="#cb4-6" tabindex="-1"></a>})[<span class="dv">3</span>]</span>
 <span id="cb4-7"><a href="#cb4-7" tabindex="-1"></a><span class="fu">sprintf</span>(<span class="st">&quot;Method 1 CPU time: %.2f Seconds&quot;</span>, t1)</span></code></pre></div>
-<pre><code>## [1] &quot;Method 1 CPU time: 3.95 Seconds&quot;</code></pre>
+<pre><code>## [1] &quot;Method 1 CPU time: 3.75 Seconds&quot;</code></pre>
 <p>為了簡化程式碼，可以改用 R 的 <code>apply</code> 系列函數</p>
 <div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a>t2 <span class="ot">&lt;-</span> <span class="fu">system.time</span>({</span>
 <span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a>  res2 <span class="ot">&lt;-</span> <span class="fu">sapply</span>(<span class="fu">seq</span>(n), <span class="cf">function</span>(i) <span class="fu">max</span>(A[i,]))</span>
 <span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a>})[<span class="dv">3</span>]</span>
 <span id="cb6-4"><a href="#cb6-4" tabindex="-1"></a><span class="fu">sprintf</span>(<span class="st">&quot;Method 3 CPU time: %.2f Seconds&quot;</span>, t2)</span></code></pre></div>
-<pre><code>## [1] &quot;Method 3 CPU time: 14.97 Seconds&quot;</code></pre>
+<pre><code>## [1] &quot;Method 3 CPU time: 14.78 Seconds&quot;</code></pre>
 <p>對於矩陣運算，可使用套件 <strong>matrixStats</strong> 內的功能</p>
 <div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a><span class="fu">library</span>(matrixStats)</span>
 <span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a>t3 <span class="ot">&lt;-</span> <span class="fu">system.time</span>({</span>
@@ -239,10 +239,10 @@ Parallelizing Cross-validation Tasks in Parameter Tuning</a></li>
 <span id="cb10-2"><a href="#cb10-2" tabindex="-1"></a>  res4 <span class="ot">&lt;-</span> A[<span class="fu">cbind</span>(<span class="dv">1</span><span class="sc">:</span>n, <span class="fu">max.col</span>(A))]</span>
 <span id="cb10-3"><a href="#cb10-3" tabindex="-1"></a>})[<span class="dv">3</span>]</span>
 <span id="cb10-4"><a href="#cb10-4" tabindex="-1"></a><span class="fu">sprintf</span>(<span class="st">&quot;Method 4 CPU time: %.2f Seconds&quot;</span>, t4)</span></code></pre></div>
-<pre><code>## [1] &quot;Method 4 CPU time: 0.64 Seconds&quot;</code></pre>
+<pre><code>## [1] &quot;Method 4 CPU time: 0.67 Seconds&quot;</code></pre>
 <p>確認四個結果皆一致</p>
 <div class="sourceCode" id="cb12"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" tabindex="-1"></a><span class="fu">all</span>((res1 <span class="sc">-</span> res2) <span class="sc">==</span> <span class="dv">0</span>) <span class="sc">&amp;</span> <span class="fu">all</span>((res1 <span class="sc">-</span> res3) <span class="sc">==</span> <span class="dv">0</span>) <span class="sc">&amp;</span> <span class="fu">all</span>((res1 <span class="sc">-</span> res4) <span class="sc">==</span> <span class="dv">0</span>) </span></code></pre></div>
-<pre><code>## [1] FALSE</code></pre>
+<pre><code>## [1] TRUE</code></pre>
 </div>
 <div id="parallel-computing-in-r" class="section level1">
 <h1>Parallel Computing in R</h1>
@@ -302,12 +302,12 @@ Process ID 執行。</p>
 <span id="cb18-2"><a href="#cb18-2" tabindex="-1"></a>  pid <span class="ot">&lt;-</span> <span class="fu">Sys.getpid</span>()</span>
 <span id="cb18-3"><a href="#cb18-3" tabindex="-1"></a>  <span class="fu">print</span>(<span class="fu">sprintf</span>(<span class="st">&quot;Task %d is running in process %d&quot;</span>, i, pid))</span>
 <span id="cb18-4"><a href="#cb18-4" tabindex="-1"></a>}</span></code></pre></div>
-<pre><code>## [1] &quot;Task 1 is running in process 11852&quot;
-## [1] &quot;Task 2 is running in process 11852&quot;
-## [1] &quot;Task 3 is running in process 11852&quot;
-## [1] &quot;Task 4 is running in process 11852&quot;
-## [1] &quot;Task 5 is running in process 11852&quot;
-## [1] &quot;Task 6 is running in process 11852&quot;</code></pre>
+<pre><code>## [1] &quot;Task 1 is running in process 21116&quot;
+## [1] &quot;Task 2 is running in process 21116&quot;
+## [1] &quot;Task 3 is running in process 21116&quot;
+## [1] &quot;Task 4 is running in process 21116&quot;
+## [1] &quot;Task 5 is running in process 21116&quot;
+## [1] &quot;Task 6 is running in process 21116&quot;</code></pre>
 <p>講同樣的 6 個空任務，指派給 4
 個執行緒進行平行運算，將程式修改如下，可看到 6 個任務由不同 Process ID
 執行。</p>
@@ -318,22 +318,22 @@ Process ID 執行。</p>
 <span id="cb20-5"><a href="#cb20-5" tabindex="-1"></a>  <span class="fu">print</span>(<span class="fu">sprintf</span>(<span class="st">&quot;Task %d is running in process %d&quot;</span>, i, pid))</span>
 <span id="cb20-6"><a href="#cb20-6" tabindex="-1"></a>}</span></code></pre></div>
 <pre><code>## [[1]]
-## [1] &quot;Task 1 is running in process 26428&quot;
+## [1] &quot;Task 1 is running in process 15196&quot;
 ## 
 ## [[2]]
-## [1] &quot;Task 2 is running in process 44132&quot;
+## [1] &quot;Task 2 is running in process 15688&quot;
 ## 
 ## [[3]]
-## [1] &quot;Task 3 is running in process 11656&quot;
+## [1] &quot;Task 3 is running in process 31356&quot;
 ## 
 ## [[4]]
-## [1] &quot;Task 4 is running in process 50480&quot;
+## [1] &quot;Task 4 is running in process 31508&quot;
 ## 
 ## [[5]]
-## [1] &quot;Task 5 is running in process 26428&quot;
+## [1] &quot;Task 5 is running in process 15196&quot;
 ## 
 ## [[6]]
-## [1] &quot;Task 6 is running in process 11656&quot;</code></pre>
+## [1] &quot;Task 6 is running in process 31508&quot;</code></pre>
 <div class="sourceCode" id="cb22"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb22-1"><a href="#cb22-1" tabindex="-1"></a><span class="fu">stopCluster</span>(cl)</span></code></pre></div>
 </div>
 <div id="toy-example-massive-simple-computation" class="section level2">
@@ -352,7 +352,7 @@ Process ID 執行。</p>
 <span id="cb25-6"><a href="#cb25-6" tabindex="-1"></a>  }</span>
 <span id="cb25-7"><a href="#cb25-7" tabindex="-1"></a>})[<span class="dv">3</span>]</span>
 <span id="cb25-8"><a href="#cb25-8" tabindex="-1"></a><span class="fu">sprintf</span>(<span class="st">&quot;Serial Version CPU time: %.2f Seconds&quot;</span>, cputime_ser)</span></code></pre></div>
-<pre><code>## [1] &quot;Serial Version CPU time: 0.00 Seconds&quot;</code></pre>
+<pre><code>## [1] &quot;Serial Version CPU time: 0.02 Seconds&quot;</code></pre>
 <div class="sourceCode" id="cb27"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb27-1"><a href="#cb27-1" tabindex="-1"></a><span class="co"># Parallel Version</span></span>
 <span id="cb27-2"><a href="#cb27-2" tabindex="-1"></a><span class="co"># initialize parallel cluster. Here, we use 4 cores</span></span>
 <span id="cb27-3"><a href="#cb27-3" tabindex="-1"></a>cl <span class="ot">=</span> <span class="fu">makeCluster</span>(<span class="dv">4</span>)</span>
@@ -366,11 +366,11 @@ Process ID 執行。</p>
 <span id="cb27-11"><a href="#cb27-11" tabindex="-1"></a><span class="co"># shutdown parallel cluster</span></span>
 <span id="cb27-12"><a href="#cb27-12" tabindex="-1"></a><span class="fu">stopCluster</span>(cl)</span>
 <span id="cb27-13"><a href="#cb27-13" tabindex="-1"></a><span class="fu">sprintf</span>(<span class="st">&quot;Parallel Version CPU time: %.2f Seconds&quot;</span>, cputime_par)</span></code></pre></div>
-<pre><code>## [1] &quot;Parallel Version CPU time: 2.92 Seconds&quot;</code></pre>
+<pre><code>## [1] &quot;Parallel Version CPU time: 2.46 Seconds&quot;</code></pre>
 <ul>
 <li>使用向量運算的執行時間為 0.00 秒</li>
-<li>使用一般 <code>for</code> 迴圈執行時間為 0.00 秒</li>
-<li>使用 4 個執行緒平行運算的執行時間為 2.92
+<li>使用一般 <code>for</code> 迴圈執行時間為 0.02 秒</li>
+<li>使用 4 個執行緒平行運算的執行時間為 2.46
 秒（回想課程說明為什麼比較慢？）</li>
 </ul>
 </div>
@@ -473,7 +473,7 @@ Process ID 執行。</p>
 <li>檢視計算時間</li>
 </ol>
 <div class="sourceCode" id="cb36"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb36-1"><a href="#cb36-1" tabindex="-1"></a><span class="fu">sprintf</span>(<span class="st">&quot;Serial Cross-validation CPU time: %.2f Seconds&quot;</span>, cputime_cv_serial)</span></code></pre></div>
-<pre><code>## [1] &quot;Serial Cross-validation CPU time: 1.04 Seconds&quot;</code></pre>
+<pre><code>## [1] &quot;Serial Cross-validation CPU time: 1.06 Seconds&quot;</code></pre>
 </div>
 <div id="homework-parallelizing-cross-validation-tasks-in-parameter-tuning" class="section level2">
 <h2>Homework: Parallelizing Cross-validation Tasks in Parameter
