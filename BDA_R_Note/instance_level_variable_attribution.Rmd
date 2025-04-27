@@ -14,9 +14,26 @@ output:
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+```{r instPkg, echo=TRUE, eval=FALSE, message=FALSE, warning=FALSE}
+install.packages(c("DALEX", "randomForest", "xgboost", "lightgbm"))
+```
+
 #
 
-```{r}
+```{r readHeart, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
+heartUrl <- 'https://raw.githubusercontent.com/PingYangChen/BDA_Course_R_Code/refs/heads/main/sample_data/Heart.csv'
+heartDf <- read.csv(heartUrl)
+heart_data <- heart_data[,-1]
+na_loc <- which(sapply(1:nrow(heart_data), function(i) sum(is.na(heart_data[i,])) > 0))
+heart_data <- heart_data[-na_loc,]
+names(heart_data)
+head(heart_data, 6)
+heart_data$ChestPain <- as.factor(heart_data$ChestPain)
+heart_data$Thal <- as.factor(heart_data$Thal)
+heart_data$AHD <- as.factor(heart_data$AHD)
+```
+
+```{r, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
 library(randomForest)
 # Fit random forest model
 cla_rf <- randomForest(AHD ~ ., data = heart_data, ntree = 100)
@@ -34,3 +51,50 @@ print(shap_1)
 plot(shap_1) 
 
 ```
+
+
+#
+
+此資料集描述房地產相關的特性與價格，包含以下欄位：
+
+- `price`: 房屋價格（貨幣單位表示）
+- `area`: 房屋面積（平方英尺）
+- `bedrooms`: 臥室數量
+- `bathrooms`: 浴室數量
+- `stories`: 層數
+- `mainroad`: 是否臨主路（`"yes"` 表示是，`"no"` 表示否）
+- `guestroom`: 是否有客房（`"yes"` 表示有，`"no"` 表示沒有）
+- `basement`: 是否有地下室（`"yes"` 表示有，`"no"` 表示沒有）
+- `hotwaterheating`: 是否有熱水供暖系統（`"yes"` 表示有，`"no"` 表示沒有）
+- `airconditioning`: 是否有空調（`"yes"` 表示有，`"no"` 表示沒有）
+- `parking`: 車位數量
+- `prefarea`: 是否位於首選地區（`"yes"` 表示是，`"no"` 表示否）
+- `furnishingstatus`: 家具狀態（`"furnished"` 表示全配家具，`"semi-furnished"` 表示部分家具，`"unfurnished"` 表示無家具）
+
+
+
+#
+
+此資料描述員工的基本資料、工作情況、與職場問卷調查分數，欲分析員工離職的可能性以及影響離職的關鍵因素，以下是資料欄位的說明：
+
+- `Attrition`: 員工是否離職（"Yes" 表示離職，"No" 表示未離職）為反應變數。
+- `Age`: 員工年齡。
+- `Gender`: 員工性別。
+- `TotalWorkingYears`: 總工作年數。
+- `YearsInCurrentRole`: 在當前職位上的工作年數。
+- `YearsSinceLastPromotion`: 自上次晉升以來的年數。
+- `DistanceFromHome`: 通勤距離。
+- `JobLevel`: 職位等級。
+- `MonthlyIncome`: 每月收入。
+- `PercentSalaryHike`: 薪資漲幅百分比。
+- `TrainingTimesLastYear`: 去年接受培訓的次數。
+- `StockOptionLevel`: 股票期權等級。
+- `EnvironmentSatisfaction`: 對工作環境的滿意度（數值表示，`1`-`4`）。
+- `JobInvolvement`: 工作參與度（數值表示，`1`-`4`）。
+- `JobSatisfaction`: 對工作的滿意度（數值表示，`1`-`4`）。
+- `RelationshipSatisfaction`: 與同事或上司的關係滿意度（數值表示，`1`-`4`）。
+- `WorkLifeBalance`: 工作與生活的平衡程度（數值表示，`1`-`4`）。
+
+
+
+
