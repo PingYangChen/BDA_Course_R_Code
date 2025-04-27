@@ -1,0 +1,36 @@
+---
+title: "Instance-level Variable Attributions"
+output:
+  prettydoc::html_pretty:
+    theme: tactile 
+    highlight: github
+    math: katex
+    toc: true
+    self-contained: true
+#date: "2025-03-11"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+#
+
+```{r}
+library(randomForest)
+# Fit random forest model
+cla_rf <- randomForest(AHD ~ ., data = heart_data, ntree = 100)
+# Create random forest explainer object
+library(DALEX)
+exp_rf <- explain(cla_rf, 
+  data = heart_data[,-ncol(heart_data)], y = as.numeric(heart_data$AHD) – 1
+)
+# Compute approximated Shapley value for the first observation
+shap_1 <- predict_parts(explainer = exp_rf, 
+  new_observation = heart_data[1,], type = "shap", B = 25
+)
+print(shap_1)
+# Draw the Shapley value of the first observation
+plot(shap_1) 
+
+```
