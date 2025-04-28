@@ -1,0 +1,354 @@
+---
+title: "Instance-level Variable Attributions"
+output:
+  prettydoc::html_pretty:
+    theme: tactile 
+    highlight: github
+    math: katex
+    toc: true
+    self-contained: true
+#date: "2025-03-11"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+這份講義主要說明如何使用 R 計算 Shapley values，針對個別資料研究解釋變數對預測值的貢獻度。以下三個例子皆以 tree-based models (Random Forest、XGBoost、LightGBM) 作為示範，建模的細節已很大程度地簡化，實用上還是建議善用交互驗證好好挑選模型參數。另外，事實上絕大多數的資料模型皆可用於 Shapley values 計算這類型的事後分析，並不限於 tree-based models，學員可自由替換模型來測試 Shapley values 計算出來的效果。
+
+```{r instPkg, echo=TRUE, eval=FALSE, message=FALSE, warning=FALSE}
+install.packages(c("DALEX", "randomForest", "xgboost", "lightgbm", "ggplot2", "gridExtra"))
+```
+
+# 範例一：心臟疾病成因
+
+資料為心臟疾病診斷結果與病患的檢驗報告數據，共有 303 位病患及 15 個欄位，以下是資料欄位的說明：
+
+- `Unnamed: 0`:	編號（不重要，資料的索引代號）
+- `Age`: 年齡（歲）
+- `Sex`: 性別（`1` = 男性，`0` = 女性）
+- `ChestPain`	胸痛類型（`typical`、`asymptomatic`、`nonanginal`、`nontypical`）
+- `RestBP`	靜止血壓（mm Hg）
+- `Chol`:	血清膽固醇濃度（mg/dl）
+- `Fbs`:	空腹血糖 > 120 mg/dl（`1` = 是，`0` = 否）
+- `RestECG`:	靜止心電圖結果（`0` = 正常、`1` = 有ST-T波異常、`2` = 左心室肥大）
+- `MaxHR`: 運動心跳最大值
+- `ExAng`: 運動誘發心絞痛（`1` = 有，`0` = 無）
+- `Oldpeak`: 運動引起的 ST 段下降（和休息時比較，單位：mm）
+- `Slope`: 運動高峰時 ST 段的坡度（`1` = 上升、`2` = 平坦、`3` = 下降）
+- `Ca`: 螢光攝影檢測到的主要血管數量（`0` - `3`）
+- `Thal`: 地中海貧血測試結果（`normal` = 正常、`fixed` = 固定缺陷、`reversable` = 可逆缺陷）
+- `AHD`: 是否有心臟病（`Yes` = 有，`No` = 無）
+
+```{r readHeart, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
+heartUrl <- 'https://raw.githubusercontent.com/PingYangChen/BDA_Course_R_Code/refs/heads/main/sample_data/Heart.csv'
+heartDf <- read.csv(heartUrl)
+heartDf$ChestPain <- as.factor(heartDf$ChestPain)
+heartDf$Fbs <- as.factor(heartDf$Fbs)
+heartDf$RestECG <- as.factor(heartDf$RestECG)
+heartDf$ExAng <- as.factor(heartDf$ExAng)
+heartDf$Slope <- as.factor(heartDf$Slope)
+heartDf$Thal <- as.factor(heartDf$Thal)
+heartDf$AHD <- as.factor(heartDf$AHD)
+```
+
+```{r procHeart, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
+# Remove the first Column: ID number
+heartDf <- heartDf[,-1]
+# Remove NAs
+locNA <- which(sapply(1:nrow(heartDf), function(i) sum(is.na(heartDf[i,])) > 0))
+heartDf <- heartDf[-locNA,]
+```
+
+```{r viewHeart, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
+names(heartDf)
+head(heartDf, 6)
+```
+
+```{r trainDataHeart, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
+heartY <- as.numeric(heartDf$AHD) - 1
+heartX <- heartDf[,-ncol(heartDf)]
+```
+
+```{r trainRfHeart, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
+library(randomForest)
+# Fit random forest model for the Heart data
+heartRfMdl <- randomForest(x = heartX, y = as.factor(heartY), ntree = 100)
+```
+
+```{r makeRfExpHeart, echo=TRUE, eval=TRUE, message=TRUE, warning=FALSE}
+# Create random forest explainer object
+library(DALEX)
+heartRfExp <- explain(heartRfMdl, data = heartX, y = heartY)
+```
+
+```{r predHeart1, echo=TRUE, eval=TRUE, message=TRUE, warning=FALSE}
+# Return the fitted values for the first 10 observations
+predict(heartRfMdl, newdata = heartX[1:10,])
+```
+<!--
+```{r expHeart1, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
+# Compute approximated Shapley value for the first observation
+shapObs_1 <- predict_parts(explainer = heartRfExp, 
+  new_observation = heartX[1,], type = "shap", B = 25
+)
+print(shapObs_1)
+```
+```{r shapHeart1, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
+# Draw the Shapley value of the first observation
+plot(shapObs_1) 
+```
+-->
+
+```{r expHeart2, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
+# Shapley value of observation 2
+shapHeartObs_2 <- predict_parts(explainer = heartRfExp, 
+  new_observation = heartX[2,], type = "shap", B = 25
+)
+print(shapHeartObs_2)
+```
+
+```{r shapHeart2, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE, fig.align='center'}
+# Draw the Shapley value of the second observation
+plot(shapHeartObs_2) 
+```
+
+```{r expHeart3, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
+# Compute approximated Shapley value for the third observation
+shapHeartObs_3 <- predict_parts(explainer = heartRfExp, 
+  new_observation = heartX[3,], type = "shap", B = 25
+)
+print(shapHeartObs_3)
+```
+```{r shapHeart3, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE, fig.align='center'}
+# Draw the Shapley value of the first observation
+plot(shapHeartObs_3) 
+```
+
+
+
+
+# 範例二：員工離職動機
+
+此資料描述員工的基本資料、工作情況、與職場問卷調查分數，欲分析員工離職的可能性以及影響離職的關鍵因素，以下是資料欄位的說明：
+
+- `Attrition`: 員工是否離職（"Yes" 表示離職，"No" 表示未離職）為反應變數。
+- `Age`: 員工年齡。
+- `Gender`: 員工性別。
+- `TotalWorkingYears`: 總工作年數。
+- `YearsInCurrentRole`: 在當前職位上的工作年數。
+- `YearsSinceLastPromotion`: 自上次晉升以來的年數。
+- `DistanceFromHome`: 通勤距離。
+- `JobLevel`: 職位等級。
+- `MonthlyIncome`: 每月收入。
+- `PercentSalaryHike`: 薪資漲幅百分比。
+- `TrainingTimesLastYear`: 去年接受培訓的次數。
+- `StockOptionLevel`: 股票期權等級。
+- `EnvironmentSatisfaction`: 對工作環境的滿意度（數值表示，`1`-`4`）。
+- `JobInvolvement`: 工作參與度（數值表示，`1`-`4`）。
+- `JobSatisfaction`: 對工作的滿意度（數值表示，`1`-`4`）。
+- `RelationshipSatisfaction`: 與同事或上司的關係滿意度（數值表示，`1`-`4`）。
+- `WorkLifeBalance`: 工作與生活的平衡程度（數值表示，`1`-`4`）。
+
+
+```{r readAttr, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
+AttrUrl <- 'https://raw.githubusercontent.com/PingYangChen/BDA_Course_R_Code/refs/heads/main/sample_data/attrition.csv'
+AttrDf <- read.csv(AttrUrl)
+AttrDf$Attrition <- as.factor(AttrDf$Attrition)
+AttrDf$Gender <- as.factor(AttrDf$Gender)
+```
+```{r viewAttr, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
+names(AttrDf)
+head(AttrDf, 6)
+```
+
+```{r trainDataAttr, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
+AttrY <- as.numeric(AttrDf$Attrition) - 1
+AttrX <- model.matrix(~ ., data = AttrDf[,-1])[,-1]
+#
+AttrY_Distri <- table(AttrY)/sum(table(AttrY))
+AttrW <- (1/AttrY_Distri[1])^AttrY * (1/AttrY_Distri[2])^(1 - AttrY)
+```
+
+```{r trainXgbAttr, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
+library(xgboost)
+attrXgbMdl <- xgboost(
+  data = AttrX, label = AttrY, nrounds = 20, weight = AttrW, verbose = FALSE,
+  params = list(max.depth = 3, eta = 0.1, objective = "binary:logistic")
+)
+```
+
+```{r makeXgbExpAttr, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
+# Create xgboost explainer object
+library(DALEX)
+attrXgbExp <- explain(attrXgbMdl, data = AttrX, y = AttrY)
+```
+
+```{r predAttr1, echo=TRUE, eval=TRUE, message=TRUE, warning=FALSE}
+# Return the fitted values for the 1st observation
+attrXgbPred <- predict(attrXgbMdl, newdata = as.matrix(AttrX))
+```
+
+
+```{r expAttr1, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
+# Shapley value of observation 1
+shapAttrObs_1 <- predict_parts(explainer = attrXgbExp, 
+  new_observation = t(as.matrix(AttrX[1,])), type = "shap", B = 25
+)
+print(shapAttrObs_1)
+```
+
+```{r shapAttr1, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE, fig.align='center'}
+# Draw the Shapley value of observation 1
+plot(shapAttrObs_1) 
+```
+
+
+```{r}
+attrXgbPredId_Yes <- which(attrXgbPred > 0.5)
+print(attrXgbPredId_Yes)
+```
+
+```{r expAttrYes, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE, fig.align='center', fig.width=12, fig.height=22}
+# Compute approximated Shapley value for observations with prediction Attrition = Yes
+library(ggplot2)
+library(gridExtra)
+
+nShpPlots <- length(attrXgbPredId_Yes)
+nShpCol <- 2
+nShpRow <- ceiling(nShpPlots/nShpCol)
+
+gplotList <- vector(mode = "list", length = nShpPlots)
+for (i in 1:nShpPlots) {
+  shapAttrObs <- predict_parts(explainer = attrXgbExp, 
+    new_observation = t(as.matrix(AttrX[attrXgbPredId_Yes[i],])), type = "shap", B = 25
+  )
+  gplotList[[i]] <- plot(shapAttrObs)
+}
+grid.arrange(grobs=gplotList, nrow = nShpRow)
+```
+
+
+
+# 範例三：房價構成要素
+
+此資料集描述房地產相關的特性與價格，包含以下欄位：
+
+- `price`: 房屋價格（貨幣單位表示）
+- `area`: 房屋面積（平方英尺）
+- `bedrooms`: 臥室數量
+- `bathrooms`: 浴室數量
+- `stories`: 層數
+- `mainroad`: 是否臨主路（`"yes"` 表示是，`"no"` 表示否）
+- `guestroom`: 是否有客房（`"yes"` 表示有，`"no"` 表示沒有）
+- `basement`: 是否有地下室（`"yes"` 表示有，`"no"` 表示沒有）
+- `hotwaterheating`: 是否有熱水供暖系統（`"yes"` 表示有，`"no"` 表示沒有）
+- `airconditioning`: 是否有空調（`"yes"` 表示有，`"no"` 表示沒有）
+- `parking`: 車位數量
+- `prefarea`: 是否位於首選地區（`"yes"` 表示是，`"no"` 表示否）
+- `furnishingstatus`: 家具狀態（`"furnished"` 表示全配家具，`"semi-furnished"` 表示部分家具，`"unfurnished"` 表示無家具）
+
+```{r readHouse, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
+HouseUrl <- 'https://raw.githubusercontent.com/PingYangChen/BDA_Course_R_Code/refs/heads/main/sample_data/housing.csv'
+HouseDf <- read.csv(HouseUrl)
+HouseDf$mainroad <- as.factor(HouseDf$mainroad)
+HouseDf$guestroom <- as.factor(HouseDf$guestroom)
+HouseDf$basement <- as.factor(HouseDf$basement)
+HouseDf$hotwaterheating <- as.factor(HouseDf$hotwaterheating)
+HouseDf$airconditioning <- as.factor(HouseDf$airconditioning)
+HouseDf$prefarea <- as.factor(HouseDf$prefarea)
+HouseDf$furnishingstatus <- as.factor(HouseDf$furnishingstatus)
+```
+```{r viewHouse, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
+names(HouseDf)
+head(HouseDf, 6)
+```
+
+
+```{r trainDataHouse, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
+HouseY <- HouseDf$price
+HouseX <- model.matrix(~ ., data = HouseDf[,-1])[,-1]
+```
+
+```{r trainLgbmHouse, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
+library(lightgbm)
+houseLgbmMdl <- lightgbm(
+  data = HouseX, label = HouseY, nrounds = 5, 
+  params = list(max.depth = 2, learning_rate = 0.5, objective = "regression", 
+                bagging_freq = 1)
+)
+```
+
+從模型檢視影響房價的前三大關鍵因子
+
+```{r makeLgbmExpHouse, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
+# Create xgboost explainer object
+library(DALEX)
+houseLgbmExp <- explain(houseLgbmMdl, data = HouseX, y = HouseY)
+```
+
+```{r makeLgbmExpHouseVI, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
+houseLgbmVarImp <- model_parts(houseLgbmExp, type = "variable_importance")
+print(houseLgbmVarImp)
+```
+```{r drawLgbmExpHouseVI, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE, fig.align='center', fig.width=8, fig.height=6}
+plot(houseLgbmVarImp)
+```
+
+以下 `HouseTestDf` 資料，此三筆資料的 `'area'` 皆一樣大，利用模型預測房價，並個別解析三者房價不同的原因。
+```{r setHouseTestDf, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
+HouseTestDf <- data.frame(
+  'area'= c(6000, 6000, 6000), 'bedrooms'= c(4, 4, 2), 'bathrooms'= c(3, 2, 1), 
+  'stories'= c(2, 4, 1), 'mainroad' = c('yes', 'yes', 'yes'), 
+  'guestroom' = c('yes', 'no', 'no'), 'basement' = c('yes', 'no', 'no'), 
+  'hotwaterheating' = c('yes', 'no', 'no'), 'airconditioning' =  c('yes', 'yes', 'no'), 
+  'parking' = c(2, 0, 0), 'prefarea' = c('no', 'no', 'no'), 
+  'furnishingstatus' = c('semi-furnished', 'unfurnished', 'semi-furnished')
+)
+print(HouseTestDf)
+```
+
+
+```{r}
+HouseTestDf$mainroad  <- factor(HouseTestDf$mainroad, levels = levels(HouseDf$mainroad))
+HouseTestDf$guestroom <- factor(HouseTestDf$guestroom, levels = levels(HouseDf$guestroom))
+HouseTestDf$basement  <- factor(HouseTestDf$basement, levels = levels(HouseDf$basement))
+HouseTestDf$hotwaterheating  <- factor(HouseTestDf$hotwaterheating, levels = levels(HouseDf$hotwaterheating))
+HouseTestDf$airconditioning  <- factor(HouseTestDf$airconditioning, levels = levels(HouseDf$airconditioning))
+HouseTestDf$prefarea         <- factor(HouseTestDf$prefarea, levels = levels(HouseDf$prefarea))
+HouseTestDf$furnishingstatus <- factor(HouseTestDf$furnishingstatus, levels = levels(HouseDf$furnishingstatus))
+```
+
+
+```{r predHouse, echo=TRUE, eval=TRUE, message=TRUE, warning=FALSE}
+# Return the fitted values for the 1st observation
+HouseTestX <- model.matrix(~ ., data = HouseTestDf)[,-1]
+houseLgbmPred <- predict(houseLgbmMdl, newdata = HouseTestX)
+print(houseLgbmPred)
+```
+
+
+
+```{r expHouse, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE, fig.align='center', fig.width=12, fig.height=14}
+# Compute approximated Shapley value for observations with prediction Attrition = Yes
+library(ggplot2)
+library(gridExtra)
+
+nShpPlots <- length(houseLgbmPred)
+nShpCol <- 1
+nShpRow <- ceiling(nShpPlots/nShpCol)
+
+gplotList <- vector(mode = "list", length = nShpPlots)
+for (i in 1:nShpPlots) {
+  shapHouseObs <- predict_parts(explainer = houseLgbmExp, 
+    new_observation = t(as.matrix(HouseTestX[i,])), type = "shap", B = 25
+  )
+  gplotList[[i]] <- plot(shapHouseObs)
+}
+grid.arrange(grobs=gplotList, nrow = nShpRow)
+```
+
+
+
+
+
