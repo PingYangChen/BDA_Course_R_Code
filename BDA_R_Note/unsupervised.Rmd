@@ -1,0 +1,39 @@
+---
+title: "Unsupervised Learning and Anomaly Detection"
+output:
+  prettydoc::html_pretty:
+    theme: tactile 
+    highlight: github
+    math: katex
+    toc: true
+    self-contained: true
+#date: "2025-03-11"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r instPkg, echo=TRUE, eval=FALSE, message=FALSE, warning=FALSE}
+install.packages(c("cluster", "mclust", "e1071", "isotree"))
+```
+
+
+```{r}
+demo_data_1 <- read.csv('unsup_data/demo_data_1.csv')
+test_data_1 <- read.csv('unsup_data/test_data_1.csv')
+plot(demo_data_1, pch = 16, col = '#666666AA', xlim = c(-1, 1), ylim = c(-1, 1), main = "Dataset 1")
+points(test_data_1, pch = 17, col = '#4444FF')
+legend("topleft", legend = c("Training Data", "Testing Data"), 
+       pch = c(16, 17), col = c('#666666', '#4444FF'))
+
+demo_data_2 <- read.csv('unsup_data/demo_data_2.csv')
+test_data_2 <- read.csv('unsup_data/test_data_2.csv')
+plot(demo_data_2, pch = 16, col = '#666666AA', 
+     xlim = c(-1, 3), ylim = c(-1, 3), main = "Dataset 2")
+points(test_data_2, pch = 17, col = '#4444FF')
+legend("topleft", legend = c("Training Data", "Testing Data"), 
+       pch = c(16, 17), col = c('#666666', '#4444FF'))
+
+```
