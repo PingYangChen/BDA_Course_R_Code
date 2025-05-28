@@ -21,19 +21,281 @@ install.packages(c("cluster", "mclust", "e1071", "isotree"))
 
 
 ```{r}
-demo_data_1 <- read.csv('unsup_data/demo_data_1.csv')
-test_data_1 <- read.csv('unsup_data/test_data_1.csv')
+demoUrl_1 <- 'https://raw.githubusercontent.com/PingYangChen/BDA_Course_R_Code/refs/heads/main/sample_data/unsup_data/demo_data_1.csv'
+testUrl_1 <- 'https://raw.githubusercontent.com/PingYangChen/BDA_Course_R_Code/refs/heads/main/sample_data/unsup_data/test_data_1.csv'
+demo_data_1 <- read.csv(demoUrl_1)
+test_data_1 <- read.csv(testUrl_1)
 plot(demo_data_1, pch = 16, col = '#666666AA', xlim = c(-1, 1), ylim = c(-1, 1), main = "Dataset 1")
 points(test_data_1, pch = 17, col = '#4444FF')
 legend("topleft", legend = c("Training Data", "Testing Data"), 
        pch = c(16, 17), col = c('#666666', '#4444FF'))
 
-demo_data_2 <- read.csv('unsup_data/demo_data_2.csv')
-test_data_2 <- read.csv('unsup_data/test_data_2.csv')
+demoUrl_2 <- 'https://raw.githubusercontent.com/PingYangChen/BDA_Course_R_Code/refs/heads/main/sample_data/unsup_data/demo_data_2.csv'
+testUrl_2 <- 'https://raw.githubusercontent.com/PingYangChen/BDA_Course_R_Code/refs/heads/main/sample_data/unsup_data/test_data_2.csv'
+demo_data_2 <- read.csv(demoUrl_2)
+test_data_2 <- read.csv(testUrl_2)
 plot(demo_data_2, pch = 16, col = '#666666AA', 
      xlim = c(-1, 3), ylim = c(-1, 3), main = "Dataset 2")
 points(test_data_2, pch = 17, col = '#4444FF')
 legend("topleft", legend = c("Training Data", "Testing Data"), 
        pch = c(16, 17), col = c('#666666', '#4444FF'))
+
+```
+
+
+```{r}
+# Import the cluster package
+library(cluster)
+# Compute pairwise distance between samples in the training data
+dist_2 <- dist(demo_data_2, method = "euclidean")
+# Build hierarchical clusters
+m_hc <- hclust(dist_2, method = "ward.D2")
+# Draw Dendrogram
+plot(m_hc)
+# Cut the Dendrogram
+cut_m_hc <- cutree(m_hc, k = 3)
+
+```
+
+
+```{r}
+# Build a classification model to predict for new data
+# For example, logistic regression model
+cla_data <- data.frame(demo_data_2, Y = cut_m_hc)
+library(glmnet)
+cla_m <- cv.glmnet(
+  x = as.matrix(cla_data[,1:2]), y = as.factor(cla_data$Y), family = "multinomial")
+# Predict groups for testing data using logistic regression model
+cla_pred_prob <- predict(
+  cla_m, as.matrix(test_data_2[,1:2]), s = cla_m$lambda.min, type = "response")
+cla_pred <- max.col(cla_pred_prob[,,1])
+# Draw clustering results
+plot(demo_data_2, pch = 16, col = '#888888AA', xlim = c(-1, 3), ylim = c(-1, 3), 
+     main = "Dataset 2: HClust + GLM Prediction")
+clust_color <- c('#2d39bd', '#f29129', '#0a8c2d')
+for (i in 1:max(cla_pred)) {
+  points(test_data_2[which(cla_pred == i),], pch = 17, col = clust_color[i])
+}
+legend("topleft", cex = 0.65, bty = "n",
+       legend = c("Training Data", paste0("Testing Data: Group ", 1:max(cla_pred))), 
+       pch = c(16, rep(17, max(cla_pred))), col = c('#666666', clust_color))
+
+```
+
+
+
+
+```{r}
+predict_km <- function(km_object, new_data) {
+  cen <- km_object$centers
+  new_data <- as.matrix(new_data)
+  if (is.null(dim(new_data))) { new_data <- matrix(new_data, 1, ncol(cen)) }
+  dist2cen <- t(sapply(1:nrow(new_data), function(i) {
+    sqrt(rowSums((cen - matrix(new_data[i,], nrow(cen), ncol(cen), byrow = TRUE))^2))
+  }))
+  colnames(dist2cen) <- rownames(km_object$centers)
+  list(
+    # Assign points in new_data to its nearest group
+    "cluster" = max.col((-1)*dist2cen), 
+    "distance" = dist2cen
+  )
+}
+
+```
+
+
+
+```{r}
+# Build K-means clusters
+m_km <- kmeans(demo_data_2, centers = 3, nstart = 5)
+# Predict groups for testing data using self-developed function
+p_km <- predict_km(m_km, test_data_2)$cluster
+
+# Draw clustering results
+plot(demo_data_2, pch = 16, col = '#888888AA', xlim = c(-1, 3), ylim = c(-1, 3), 
+     main = "Dataset 2: K-means Prediction")
+clust_color <- c('#2d39bd', '#f29129', '#0a8c2d')
+points(m_km$centers, pch = 20, col = clust_color)
+for (i in 1:max(p_km)) {
+  points(test_data_2[which(p_km == i),], pch = 17, col = clust_color[i])
+}
+legend("topleft", cex = 0.65, bty = "n",
+       legend = c("Training Data", paste0("Testing Data: Group ", 1:max(p_km))), 
+       pch = c(16, rep(17, max(p_km))), col = c('#666666', clust_color))
+
+```
+
+```{r}
+# x: 2d matrix or data.frame of size (n, d)
+# g: vector of factors or integers of length n
+total_ssw <- function(x, g) {
+  x <- as.matrix(x)
+  ug <- unique(g)
+  ssw <- 0
+  for (i in 1:length(ug)) {
+    xg <- x[which(g == ug[i]),]
+    mg <- matrix(colMeans(xg), nrow(xg), ncol(x), byrow = TRUE)
+    ssw <- ssw + sum((xg - mg)^2)
+  }
+  return(ssw)
+}
+
+```
+```{r}
+# Set the maximum number of clusters
+max_clust <- 8
+# Run K-means for each setup and then compute SSW
+ssw_vec <- numeric(max_clust)
+for (i in 1:max_clust) {
+  tmp_km <- kmeans(demo_data_2, centers = i, nstart = 5)
+  ssw_vec[i] <- total_ssw(demo_data_2, tmp_km$cluster)
+}
+# Visualize the values of SSW at each setup
+plot(1:max_clust, ssw_vec, type = "l", main = "k-Means Clusters", 
+     xlab = "Number of Clusters", ylab = "Total Within Sum of Square")
+points(1:max_clust, ssw_vec, pch = 16)
+
+```
+```{r}
+# Set the maximum number of clusters
+max_clust <- 8
+# Run K-means for each setup and then compute Average Silhouette
+silh_list <- vector("list", length = max_clust - 1)
+mean_silh_vec <- numeric(max_clust - 1)
+for (i in 2:max_clust) {
+  tmp_km <- kmeans(demo_data_2, centers = i, nstart = 5)
+  silh = silhouette(tmp_km$cluster, dist(demo_data_2)) 
+  silh_list[[i-1]] <- silh
+  mean_silh_vec[i-1] <- mean(silh[,3])
+}
+# Visualize the values of Average Silhouette at each setup
+plot(2:max_clust, mean_silh_vec, type = "l", main = "k-Means Clusters", 
+     xlab = "Number of Clusters", ylab = "Average Silhouette Score")
+points(2:max_clust, mean_silh_vec, pch = 16)
+
+```
+```{r}
+# Draw Silhouette Plot at each setup
+par(mfrow = c(2, 4))
+for (i in 2:max_clust) {
+  plot(silh_list[[i - 1]])
+  abline(v = mean_silh_vec[i-1], col = "red")
+}
+par(mfrow = c(1, 1))
+
+```
+```{r}
+library(mclust) # Import the mclust package
+# Build GMM model
+m_gmm <- Mclust(demo_data_2, G = 2:4, modelNames = c("EII", "VEI", "VVE", "VVV"))
+m_gmm$BIC
+
+```
+```{r}
+m_gmm_den <- densityMclust(
+  demo_data_2, G = 2:4, modelNames = c("EII", "VEI", "VVE", "VVV"), plot = FALSE)
+m_gmm_den$BIC
+
+```
+```{r}
+# Import the mclust package
+library(mclust)
+# Build GMM model
+m_gmm <- Mclust(demo_data_2, G = 2:4, modelNames = c("EII", "VEI", "VVE", "VVV"))
+m_gmm_cen <- t(m_gmm$parameters$mean) # get cluster centers
+# Predict groups for testing data
+p_gmm <- predict(m_gmm, test_data_2)
+p_gmm_gp <- p_gmm$classification # get predicted cluster ID
+# Draw the clustering results
+plot(demo_data_2, pch = 16, col = '#888888AA', xlim = c(-1, 3), ylim = c(-1, 3), 
+     main = "Dataset 2: GMM Prediction")
+clust_color <- c('#2d39bd', '#f29129', '#0a8c2d')
+points(m_gmm_cen, pch = 20, col = clust_color)
+for (i in 1:max(p_gmm_gp)) {
+  points(test_data_2[which(p_gmm_gp == i),], pch = 17, col = clust_color[i])
+}
+legend("topleft", cex = 0.65, bty = "n",
+       legend = c("Training Data", paste0("Testing Data: Group ", 1:max(p_gmm_gp))), 
+       pch = c(16, rep(17, max(p_gmm_gp))), col = c('#666666', clust_color))
+
+```
+
+
+# Anomaly Detection
+```{r}
+# Import the e1071 package
+library(e1071)
+# Build OCSVM model
+m_svm <- svm(~ x1 + x2, data = demo_data_1, type = "one-classification", 
+             kernel = "radial", nu = .25)
+# Predict for the testing data
+p_svm <- predict(m_svm, test_data_1, decision.values = TRUE)
+# Draw detection results
+plot(demo_data_1, pch = 16, col = '#888888AA', xlim = c(-1, 1), ylim = c(-1, 1), 
+     main = "Dataset 1: OCSVM Prediction")
+points(test_data_1[which(p_svm),], pch = 17, col = '#4444FF')
+points(test_data_1[which(!p_svm),], pch = 17, col = '#FF4444')
+legend("topleft", cex = 0.65, bty = "n",
+       legend = c("Training Data", "Testing Data (Pred. Noraml)", 
+                  "Testing Data (Pred. Anomalous)"), 
+       pch = c(16, 17, 17), col = c('#666666', '#4444FF', '#FF4444'))
+
+```
+
+```{r}
+# Import the isotree package
+library(isotree)
+# Build iForest model
+m_if <- isolation.forest(demo_data_1, ndim = 1, max_depth = 8, ntrees = 100) #sample_size = 256
+# Predict for testing data
+p_if <- predict(m_if, test_data_1, type = "score")
+# Draw detection results
+plot(demo_data_1, pch = 16, col = '#888888AA', xlim = c(-1, 1), ylim = c(-1, 1), 
+     main = "Dataset 1: iForest Prediction")
+points(test_data_1[which(p_if <= 0.5),], pch = 17, col = '#4444FF')
+points(test_data_1[which(p_if > 0.5),], pch = 17, col = '#FF4444')
+legend("topleft", cex = 0.65, bty = "n",
+       legend = c("Training Data", 
+                  "Testing Data (Pred. Noraml)", "Testing Data (Pred. Anomalous)"), 
+       pch = c(16, 17, 17), col = c('#666666', '#4444FF', '#FF4444'))
+
+```
+
+```{r}
+# Build K-means clusters
+m_km <- kmeans(demo_data_2, centers = 3, nstart = 5)
+# Predict groups for testing data using self-developed function
+p_km <- predict_km(m_km, test_data_2)
+# Compute Silhouette score of the testing data
+silh_val <- t(sapply(1:nrow(p_km$distance), function(k) {
+  c(p_km$distance[k,p_km$cluster[k]], min(p_km$distance[k,-p_km$cluster[k]]))
+}))
+p_km_score <- (silh_val[,2] - silh_val[,1])/pmax(silh_val[,1], silh_val[,2])
+# print(p_km_score)
+
+```
+
+```{r}
+# Import the mclust package
+library(mclust)
+# Build GMM model with estimating the GMM density
+m_gmmden <- densityMclust(
+  demo_data_2, G = 2:4, 
+  modelNames = c("EII", "VEI", "VVE", "VVV"), plot = FALSE
+)
+# Compute the logarithm of GMM density values for testing data
+p_gmmden <- log(predict(m_gmmden, test_data_2))
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
 
 ```
