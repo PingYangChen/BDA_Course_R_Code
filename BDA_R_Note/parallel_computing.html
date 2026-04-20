@@ -31,8 +31,9 @@ document.addEventListener('DOMContentLoaded', function(e) {
 
 <style type="text/css">code{white-space: pre;}</style>
 <style type="text/css" data-origin="pandoc">
+html { -webkit-text-size-adjust: 100%; }
 pre > code.sourceCode { white-space: pre; position: relative; }
-pre > code.sourceCode > span { line-height: 1.25; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
 pre > code.sourceCode > span:empty { height: 1.2em; }
 .sourceCode { overflow: visible; }
 code.sourceCode > span { color: inherit; text-decoration: inherit; }
@@ -43,7 +44,7 @@ div.sourceCode { overflow: auto; }
 }
 @media print {
 pre > code.sourceCode { white-space: pre-wrap; }
-pre > code.sourceCode > span { display: inline-block; text-indent: -5em; padding-left: 5em; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
 }
 pre.numberSource code
 { counter-reset: source-line 0; }
@@ -207,9 +208,9 @@ Parallelizing Cross-validation Tasks in Parameter Tuning</a></li>
 <span id="cb2-4"><a href="#cb2-4" tabindex="-1"></a></span>
 <span id="cb2-5"><a href="#cb2-5" tabindex="-1"></a>})[<span class="dv">3</span>] <span class="co"># seconds</span></span></code></pre></div>
 <p>以下用個簡單的範例來說明：<strong>輸出大型整數矩陣每列的最大值</strong></p>
-<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a>n <span class="ot">&lt;-</span> <span class="fl">1e7</span> <span class="co"># nrows</span></span>
+<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a>n <span class="ot">&lt;-</span> <span class="fl">1e6</span> <span class="co"># nrows</span></span>
 <span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a>p <span class="ot">&lt;-</span> <span class="dv">10</span>  <span class="co"># ncols</span></span>
-<span id="cb3-3"><a href="#cb3-3" tabindex="-1"></a><span class="fu">set.seed</span>(<span class="dv">2025</span>)</span>
+<span id="cb3-3"><a href="#cb3-3" tabindex="-1"></a><span class="fu">set.seed</span>(<span class="dv">2026</span>)</span>
 <span id="cb3-4"><a href="#cb3-4" tabindex="-1"></a>A <span class="ot">&lt;-</span> <span class="fu">matrix</span>(<span class="fu">sample</span>(<span class="dv">1</span><span class="sc">:</span><span class="dv">100</span>, n<span class="sc">*</span>p, <span class="at">replace =</span> <span class="cn">TRUE</span>), n, p)</span></code></pre></div>
 <p>最直接的想法為使用 <code>for</code> 迴圈，以 <code>max()</code>
 函數逐列計算各列的最大值</p>
@@ -220,41 +221,52 @@ Parallelizing Cross-validation Tasks in Parameter Tuning</a></li>
 <span id="cb4-5"><a href="#cb4-5" tabindex="-1"></a>  }</span>
 <span id="cb4-6"><a href="#cb4-6" tabindex="-1"></a>})[<span class="dv">3</span>]</span>
 <span id="cb4-7"><a href="#cb4-7" tabindex="-1"></a><span class="fu">sprintf</span>(<span class="st">&quot;Method 1 CPU time: %.2f Seconds&quot;</span>, t1)</span></code></pre></div>
-<pre><code>## [1] &quot;Method 1 CPU time: 3.75 Seconds&quot;</code></pre>
+<pre><code>## [1] &quot;Method 1 CPU time: 0.26 Seconds&quot;</code></pre>
 <p>為了簡化程式碼，可以改用 R 的 <code>apply</code> 系列函數</p>
 <div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a>t2 <span class="ot">&lt;-</span> <span class="fu">system.time</span>({</span>
 <span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a>  res2 <span class="ot">&lt;-</span> <span class="fu">sapply</span>(<span class="fu">seq</span>(n), <span class="cf">function</span>(i) <span class="fu">max</span>(A[i,]))</span>
 <span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a>})[<span class="dv">3</span>]</span>
-<span id="cb6-4"><a href="#cb6-4" tabindex="-1"></a><span class="fu">sprintf</span>(<span class="st">&quot;Method 3 CPU time: %.2f Seconds&quot;</span>, t2)</span></code></pre></div>
-<pre><code>## [1] &quot;Method 3 CPU time: 14.78 Seconds&quot;</code></pre>
+<span id="cb6-4"><a href="#cb6-4" tabindex="-1"></a><span class="fu">sprintf</span>(<span class="st">&quot;Method 2 CPU time: %.2f Seconds&quot;</span>, t2)</span></code></pre></div>
+<pre><code>## [1] &quot;Method 2 CPU time: 0.86 Seconds&quot;</code></pre>
 <p>對於矩陣運算，可使用套件 <strong>matrixStats</strong> 內的功能</p>
 <div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a><span class="fu">library</span>(matrixStats)</span>
 <span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a>t3 <span class="ot">&lt;-</span> <span class="fu">system.time</span>({</span>
 <span id="cb8-3"><a href="#cb8-3" tabindex="-1"></a>  res3 <span class="ot">&lt;-</span> <span class="fu">rowOrderStats</span>(A, <span class="at">which =</span> p)</span>
 <span id="cb8-4"><a href="#cb8-4" tabindex="-1"></a>})[<span class="dv">3</span>]</span>
 <span id="cb8-5"><a href="#cb8-5" tabindex="-1"></a><span class="fu">sprintf</span>(<span class="st">&quot;Method 3 CPU time: %.2f Seconds&quot;</span>, t3)</span></code></pre></div>
-<pre><code>## [1] &quot;Method 3 CPU time: 0.61 Seconds&quot;</code></pre>
+<pre><code>## [1] &quot;Method 3 CPU time: 0.06 Seconds&quot;</code></pre>
 <p>若熟悉矩陣排列 indexing，以下方法可能是計算速度最快的</p>
 <div class="sourceCode" id="cb10"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" tabindex="-1"></a>t4 <span class="ot">&lt;-</span> <span class="fu">system.time</span>({</span>
 <span id="cb10-2"><a href="#cb10-2" tabindex="-1"></a>  res4 <span class="ot">&lt;-</span> A[<span class="fu">cbind</span>(<span class="dv">1</span><span class="sc">:</span>n, <span class="fu">max.col</span>(A))]</span>
 <span id="cb10-3"><a href="#cb10-3" tabindex="-1"></a>})[<span class="dv">3</span>]</span>
 <span id="cb10-4"><a href="#cb10-4" tabindex="-1"></a><span class="fu">sprintf</span>(<span class="st">&quot;Method 4 CPU time: %.2f Seconds&quot;</span>, t4)</span></code></pre></div>
-<pre><code>## [1] &quot;Method 4 CPU time: 0.67 Seconds&quot;</code></pre>
+<pre><code>## [1] &quot;Method 4 CPU time: 0.10 Seconds&quot;</code></pre>
 <p>確認四個結果皆一致</p>
 <div class="sourceCode" id="cb12"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" tabindex="-1"></a><span class="fu">all</span>((res1 <span class="sc">-</span> res2) <span class="sc">==</span> <span class="dv">0</span>) <span class="sc">&amp;</span> <span class="fu">all</span>((res1 <span class="sc">-</span> res3) <span class="sc">==</span> <span class="dv">0</span>) <span class="sc">&amp;</span> <span class="fu">all</span>((res1 <span class="sc">-</span> res4) <span class="sc">==</span> <span class="dv">0</span>) </span></code></pre></div>
 <pre><code>## [1] TRUE</code></pre>
+<p>計算 Speed-up (數字大於 1 表示 Column 顯示的方法優於 Row
+顯示的方法)</p>
+<pre><code>## CPU times:</code></pre>
+<pre><code>## Method 1 Method 2 Method 3 Method 4 
+##     0.26     0.86     0.06     0.10</code></pre>
+<pre><code>## Speed-up:</code></pre>
+<pre><code>##          Method 1 Method 2 Method 3 Method 4
+## Method 1    1.000    0.302    4.333      2.6
+## Method 2    3.308    1.000   14.333      8.6
+## Method 3    0.231    0.070    1.000      0.6
+## Method 4    0.385    0.116    1.667      1.0</code></pre>
 </div>
 <div id="parallel-computing-in-r" class="section level1">
 <h1>Parallel Computing in R</h1>
 <p>本篇以較容易上手的 <strong>foreach</strong> 與
 <strong>doParallel</strong> 套件說明在 R 中的平行運算</p>
-<div class="sourceCode" id="cb14"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" tabindex="-1"></a><span class="fu">library</span>(foreach)</span>
-<span id="cb14-2"><a href="#cb14-2" tabindex="-1"></a><span class="fu">library</span>(doParallel)</span></code></pre></div>
+<div class="sourceCode" id="cb18"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb18-1"><a href="#cb18-1" tabindex="-1"></a><span class="fu">library</span>(foreach)</span>
+<span id="cb18-2"><a href="#cb18-2" tabindex="-1"></a><span class="fu">library</span>(doParallel)</span></code></pre></div>
 <div id="basic-concept-of-parallelism" class="section level2">
 <h2>Basic Concept of Parallelism</h2>
 <p>使用平行運算之前，首先透過 <code>detectCores()</code>
 確認自己的主機有多少執行緒（threads）可供平行運算使用。</p>
-<div class="sourceCode" id="cb15"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb15-1"><a href="#cb15-1" tabindex="-1"></a><span class="fu">detectCores</span>(<span class="at">logical =</span> <span class="cn">TRUE</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb19"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb19-1"><a href="#cb19-1" tabindex="-1"></a><span class="fu">detectCores</span>(<span class="at">logical =</span> <span class="cn">TRUE</span>)</span></code></pre></div>
 <pre><code>## [1] 24</code></pre>
 <p>以 16 核心的 <a href="https://www.intel.com/content/www/us/en/products/sku/230490/intel-core-i713700-processor-30m-cache-up-to-5-20-ghz/specifications.html">Intel(R)
 Core(TM) i7-13700 2.10 GHz CPU</a> 為例，總共有
@@ -282,95 +294,95 @@ Cluster</li>
 <li>結束計時運算時間</li>
 <li><strong>關閉 Cluster 註冊</strong>（極重要!!!）</li>
 </ol>
-<div class="sourceCode" id="cb17"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb17-1"><a href="#cb17-1" tabindex="-1"></a>nThreads <span class="ot">&lt;-</span> <span class="dv">4</span></span>
-<span id="cb17-2"><a href="#cb17-2" tabindex="-1"></a>cl <span class="ot">=</span> <span class="fu">makeCluster</span>(nThreads)  <span class="co"># initialize parallel cluster with</span></span>
-<span id="cb17-3"><a href="#cb17-3" tabindex="-1"></a><span class="fu">registerDoParallel</span>(cl) <span class="co"># sets up the cluster for the foreach loop</span></span>
-<span id="cb17-4"><a href="#cb17-4" tabindex="-1"></a>cputime <span class="ot">&lt;-</span> <span class="fu">system.time</span>({</span>
-<span id="cb17-5"><a href="#cb17-5" tabindex="-1"></a></span>
-<span id="cb17-6"><a href="#cb17-6" tabindex="-1"></a>  result <span class="ot">&lt;-</span> <span class="fu">foreach</span> (<span class="at">i =</span> <span class="dv">1</span><span class="sc">:</span>n_tasks, <span class="at">.combine =</span> AAA, <span class="at">.packages =</span> BBB) <span class="sc">%dopar%</span> { </span>
-<span id="cb17-7"><a href="#cb17-7" tabindex="-1"></a>    </span>
-<span id="cb17-8"><a href="#cb17-8" tabindex="-1"></a>    ... <span class="co"># codes of parallelized task</span></span>
-<span id="cb17-9"><a href="#cb17-9" tabindex="-1"></a></span>
-<span id="cb17-10"><a href="#cb17-10" tabindex="-1"></a>  }</span>
-<span id="cb17-11"><a href="#cb17-11" tabindex="-1"></a></span>
-<span id="cb17-12"><a href="#cb17-12" tabindex="-1"></a>})[<span class="dv">3</span>] <span class="co"># seconds</span></span>
-<span id="cb17-13"><a href="#cb17-13" tabindex="-1"></a><span class="fu">stopCluster</span>(cl) <span class="co"># IMPORTANT! shutdown parallel cluster</span></span></code></pre></div>
+<div class="sourceCode" id="cb21"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb21-1"><a href="#cb21-1" tabindex="-1"></a>nThreads <span class="ot">&lt;-</span> <span class="dv">4</span></span>
+<span id="cb21-2"><a href="#cb21-2" tabindex="-1"></a>cl <span class="ot">=</span> <span class="fu">makeCluster</span>(nThreads)  <span class="co"># initialize parallel cluster with</span></span>
+<span id="cb21-3"><a href="#cb21-3" tabindex="-1"></a><span class="fu">registerDoParallel</span>(cl) <span class="co"># sets up the cluster for the foreach loop</span></span>
+<span id="cb21-4"><a href="#cb21-4" tabindex="-1"></a>cputime <span class="ot">&lt;-</span> <span class="fu">system.time</span>({</span>
+<span id="cb21-5"><a href="#cb21-5" tabindex="-1"></a></span>
+<span id="cb21-6"><a href="#cb21-6" tabindex="-1"></a>  result <span class="ot">&lt;-</span> <span class="fu">foreach</span> (<span class="at">i =</span> <span class="dv">1</span><span class="sc">:</span>n_tasks, <span class="at">.combine =</span> AAA, <span class="at">.packages =</span> BBB) <span class="sc">%dopar%</span> { </span>
+<span id="cb21-7"><a href="#cb21-7" tabindex="-1"></a>    </span>
+<span id="cb21-8"><a href="#cb21-8" tabindex="-1"></a>    ... <span class="co"># codes of parallelized task</span></span>
+<span id="cb21-9"><a href="#cb21-9" tabindex="-1"></a></span>
+<span id="cb21-10"><a href="#cb21-10" tabindex="-1"></a>  }</span>
+<span id="cb21-11"><a href="#cb21-11" tabindex="-1"></a></span>
+<span id="cb21-12"><a href="#cb21-12" tabindex="-1"></a>})[<span class="dv">3</span>] <span class="co"># seconds</span></span>
+<span id="cb21-13"><a href="#cb21-13" tabindex="-1"></a><span class="fu">stopCluster</span>(cl) <span class="co"># IMPORTANT! shutdown parallel cluster</span></span></code></pre></div>
 <p>範例為執行 6 個空任務，每個任務只輸出當下執行的 Process
 ID，先看一般使用 <code>for</code> 迴圈的版本，可發現 6 個任務皆由同一個
 Process ID 執行。</p>
-<div class="sourceCode" id="cb18"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb18-1"><a href="#cb18-1" tabindex="-1"></a><span class="cf">for</span> (i <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">6</span>) { </span>
-<span id="cb18-2"><a href="#cb18-2" tabindex="-1"></a>  pid <span class="ot">&lt;-</span> <span class="fu">Sys.getpid</span>()</span>
-<span id="cb18-3"><a href="#cb18-3" tabindex="-1"></a>  <span class="fu">print</span>(<span class="fu">sprintf</span>(<span class="st">&quot;Task %d is running in process %d&quot;</span>, i, pid))</span>
-<span id="cb18-4"><a href="#cb18-4" tabindex="-1"></a>}</span></code></pre></div>
-<pre><code>## [1] &quot;Task 1 is running in process 21116&quot;
-## [1] &quot;Task 2 is running in process 21116&quot;
-## [1] &quot;Task 3 is running in process 21116&quot;
-## [1] &quot;Task 4 is running in process 21116&quot;
-## [1] &quot;Task 5 is running in process 21116&quot;
-## [1] &quot;Task 6 is running in process 21116&quot;</code></pre>
+<div class="sourceCode" id="cb22"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb22-1"><a href="#cb22-1" tabindex="-1"></a><span class="cf">for</span> (i <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">6</span>) { </span>
+<span id="cb22-2"><a href="#cb22-2" tabindex="-1"></a>  pid <span class="ot">&lt;-</span> <span class="fu">Sys.getpid</span>()</span>
+<span id="cb22-3"><a href="#cb22-3" tabindex="-1"></a>  <span class="fu">print</span>(<span class="fu">sprintf</span>(<span class="st">&quot;Task %d is running in process %d&quot;</span>, i, pid))</span>
+<span id="cb22-4"><a href="#cb22-4" tabindex="-1"></a>}</span></code></pre></div>
+<pre><code>## [1] &quot;Task 1 is running in process 34456&quot;
+## [1] &quot;Task 2 is running in process 34456&quot;
+## [1] &quot;Task 3 is running in process 34456&quot;
+## [1] &quot;Task 4 is running in process 34456&quot;
+## [1] &quot;Task 5 is running in process 34456&quot;
+## [1] &quot;Task 6 is running in process 34456&quot;</code></pre>
 <p>講同樣的 6 個空任務，指派給 4
 個執行緒進行平行運算，將程式修改如下，可看到 6 個任務由不同 Process ID
 執行。</p>
-<div class="sourceCode" id="cb20"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb20-1"><a href="#cb20-1" tabindex="-1"></a>cl <span class="ot">&lt;-</span> <span class="fu">makeCluster</span>(<span class="dv">4</span>)</span>
-<span id="cb20-2"><a href="#cb20-2" tabindex="-1"></a><span class="fu">registerDoParallel</span>(cl)</span>
-<span id="cb20-3"><a href="#cb20-3" tabindex="-1"></a><span class="fu">foreach</span> (<span class="at">i =</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">6</span>) <span class="sc">%dopar%</span> { </span>
-<span id="cb20-4"><a href="#cb20-4" tabindex="-1"></a>  pid <span class="ot">&lt;-</span> <span class="fu">Sys.getpid</span>()</span>
-<span id="cb20-5"><a href="#cb20-5" tabindex="-1"></a>  <span class="fu">print</span>(<span class="fu">sprintf</span>(<span class="st">&quot;Task %d is running in process %d&quot;</span>, i, pid))</span>
-<span id="cb20-6"><a href="#cb20-6" tabindex="-1"></a>}</span></code></pre></div>
+<div class="sourceCode" id="cb24"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb24-1"><a href="#cb24-1" tabindex="-1"></a>cl <span class="ot">&lt;-</span> <span class="fu">makeCluster</span>(<span class="dv">4</span>)</span>
+<span id="cb24-2"><a href="#cb24-2" tabindex="-1"></a><span class="fu">registerDoParallel</span>(cl)</span>
+<span id="cb24-3"><a href="#cb24-3" tabindex="-1"></a><span class="fu">foreach</span> (<span class="at">i =</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">6</span>) <span class="sc">%dopar%</span> { </span>
+<span id="cb24-4"><a href="#cb24-4" tabindex="-1"></a>  pid <span class="ot">&lt;-</span> <span class="fu">Sys.getpid</span>()</span>
+<span id="cb24-5"><a href="#cb24-5" tabindex="-1"></a>  <span class="fu">print</span>(<span class="fu">sprintf</span>(<span class="st">&quot;Task %d is running in process %d&quot;</span>, i, pid))</span>
+<span id="cb24-6"><a href="#cb24-6" tabindex="-1"></a>}</span></code></pre></div>
 <pre><code>## [[1]]
-## [1] &quot;Task 1 is running in process 15196&quot;
+## [1] &quot;Task 1 is running in process 35832&quot;
 ## 
 ## [[2]]
-## [1] &quot;Task 2 is running in process 15688&quot;
+## [1] &quot;Task 2 is running in process 23032&quot;
 ## 
 ## [[3]]
-## [1] &quot;Task 3 is running in process 31356&quot;
+## [1] &quot;Task 3 is running in process 24980&quot;
 ## 
 ## [[4]]
-## [1] &quot;Task 4 is running in process 31508&quot;
+## [1] &quot;Task 4 is running in process 38936&quot;
 ## 
 ## [[5]]
-## [1] &quot;Task 5 is running in process 15196&quot;
+## [1] &quot;Task 5 is running in process 35832&quot;
 ## 
 ## [[6]]
-## [1] &quot;Task 6 is running in process 31508&quot;</code></pre>
-<div class="sourceCode" id="cb22"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb22-1"><a href="#cb22-1" tabindex="-1"></a><span class="fu">stopCluster</span>(cl)</span></code></pre></div>
+## [1] &quot;Task 6 is running in process 24980&quot;</code></pre>
+<div class="sourceCode" id="cb26"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb26-1"><a href="#cb26-1" tabindex="-1"></a><span class="fu">stopCluster</span>(cl)</span></code></pre></div>
 </div>
 <div id="toy-example-massive-simple-computation" class="section level2">
 <h2>Toy Example: Massive Simple Computation</h2>
-<div class="sourceCode" id="cb23"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb23-1"><a href="#cb23-1" tabindex="-1"></a><span class="co"># Vector Version</span></span>
-<span id="cb23-2"><a href="#cb23-2" tabindex="-1"></a>cputime_vec <span class="ot">&lt;-</span> <span class="fu">system.time</span>({</span>
-<span id="cb23-3"><a href="#cb23-3" tabindex="-1"></a>  vector_result <span class="ot">&lt;-</span> <span class="fu">sqrt</span>(<span class="dv">1</span><span class="sc">:</span><span class="dv">20000</span>) </span>
-<span id="cb23-4"><a href="#cb23-4" tabindex="-1"></a>})[<span class="dv">3</span>]</span>
-<span id="cb23-5"><a href="#cb23-5" tabindex="-1"></a><span class="fu">sprintf</span>(<span class="st">&quot;Vector Version CPU time: %.2f Seconds&quot;</span>, cputime_vec)</span></code></pre></div>
+<div class="sourceCode" id="cb27"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb27-1"><a href="#cb27-1" tabindex="-1"></a><span class="co"># Vector Version</span></span>
+<span id="cb27-2"><a href="#cb27-2" tabindex="-1"></a>cputime_vec <span class="ot">&lt;-</span> <span class="fu">system.time</span>({</span>
+<span id="cb27-3"><a href="#cb27-3" tabindex="-1"></a>  vector_result <span class="ot">&lt;-</span> <span class="fu">sqrt</span>(<span class="dv">1</span><span class="sc">:</span><span class="dv">20000</span>) </span>
+<span id="cb27-4"><a href="#cb27-4" tabindex="-1"></a>})[<span class="dv">3</span>]</span>
+<span id="cb27-5"><a href="#cb27-5" tabindex="-1"></a><span class="fu">sprintf</span>(<span class="st">&quot;Vector Version CPU time: %.2f Seconds&quot;</span>, cputime_vec)</span></code></pre></div>
 <pre><code>## [1] &quot;Vector Version CPU time: 0.00 Seconds&quot;</code></pre>
-<div class="sourceCode" id="cb25"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb25-1"><a href="#cb25-1" tabindex="-1"></a><span class="co"># Serial Version</span></span>
-<span id="cb25-2"><a href="#cb25-2" tabindex="-1"></a>serial_result <span class="ot">&lt;-</span> <span class="fu">numeric</span>(<span class="dv">20000</span>)</span>
-<span id="cb25-3"><a href="#cb25-3" tabindex="-1"></a>cputime_ser <span class="ot">&lt;-</span> <span class="fu">system.time</span>({</span>
-<span id="cb25-4"><a href="#cb25-4" tabindex="-1"></a>  <span class="cf">for</span> (i <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">20000</span>) { </span>
-<span id="cb25-5"><a href="#cb25-5" tabindex="-1"></a>    serial_result[i] <span class="ot">&lt;-</span> <span class="fu">sqrt</span>(i) </span>
-<span id="cb25-6"><a href="#cb25-6" tabindex="-1"></a>  }</span>
-<span id="cb25-7"><a href="#cb25-7" tabindex="-1"></a>})[<span class="dv">3</span>]</span>
-<span id="cb25-8"><a href="#cb25-8" tabindex="-1"></a><span class="fu">sprintf</span>(<span class="st">&quot;Serial Version CPU time: %.2f Seconds&quot;</span>, cputime_ser)</span></code></pre></div>
-<pre><code>## [1] &quot;Serial Version CPU time: 0.02 Seconds&quot;</code></pre>
-<div class="sourceCode" id="cb27"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb27-1"><a href="#cb27-1" tabindex="-1"></a><span class="co"># Parallel Version</span></span>
-<span id="cb27-2"><a href="#cb27-2" tabindex="-1"></a><span class="co"># initialize parallel cluster. Here, we use 4 cores</span></span>
-<span id="cb27-3"><a href="#cb27-3" tabindex="-1"></a>cl <span class="ot">=</span> <span class="fu">makeCluster</span>(<span class="dv">4</span>)</span>
-<span id="cb27-4"><a href="#cb27-4" tabindex="-1"></a><span class="co"># sets up the cluster for the foreach loop</span></span>
-<span id="cb27-5"><a href="#cb27-5" tabindex="-1"></a><span class="fu">registerDoParallel</span>(cl)</span>
-<span id="cb27-6"><a href="#cb27-6" tabindex="-1"></a>cputime_par <span class="ot">&lt;-</span> <span class="fu">system.time</span>({</span>
-<span id="cb27-7"><a href="#cb27-7" tabindex="-1"></a>  result <span class="ot">&lt;-</span> <span class="fu">foreach</span> (<span class="at">i =</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">20000</span>, <span class="at">.combine =</span> <span class="st">&#39;c&#39;</span>) <span class="sc">%dopar%</span> { </span>
-<span id="cb27-8"><a href="#cb27-8" tabindex="-1"></a>    <span class="fu">sqrt</span>(i)</span>
-<span id="cb27-9"><a href="#cb27-9" tabindex="-1"></a>  }</span>
-<span id="cb27-10"><a href="#cb27-10" tabindex="-1"></a>})[<span class="dv">3</span>] <span class="co"># seconds</span></span>
-<span id="cb27-11"><a href="#cb27-11" tabindex="-1"></a><span class="co"># shutdown parallel cluster</span></span>
-<span id="cb27-12"><a href="#cb27-12" tabindex="-1"></a><span class="fu">stopCluster</span>(cl)</span>
-<span id="cb27-13"><a href="#cb27-13" tabindex="-1"></a><span class="fu">sprintf</span>(<span class="st">&quot;Parallel Version CPU time: %.2f Seconds&quot;</span>, cputime_par)</span></code></pre></div>
-<pre><code>## [1] &quot;Parallel Version CPU time: 2.46 Seconds&quot;</code></pre>
+<div class="sourceCode" id="cb29"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb29-1"><a href="#cb29-1" tabindex="-1"></a><span class="co"># Serial Version</span></span>
+<span id="cb29-2"><a href="#cb29-2" tabindex="-1"></a>serial_result <span class="ot">&lt;-</span> <span class="fu">numeric</span>(<span class="dv">20000</span>)</span>
+<span id="cb29-3"><a href="#cb29-3" tabindex="-1"></a>cputime_ser <span class="ot">&lt;-</span> <span class="fu">system.time</span>({</span>
+<span id="cb29-4"><a href="#cb29-4" tabindex="-1"></a>  <span class="cf">for</span> (i <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">20000</span>) { </span>
+<span id="cb29-5"><a href="#cb29-5" tabindex="-1"></a>    serial_result[i] <span class="ot">&lt;-</span> <span class="fu">sqrt</span>(i) </span>
+<span id="cb29-6"><a href="#cb29-6" tabindex="-1"></a>  }</span>
+<span id="cb29-7"><a href="#cb29-7" tabindex="-1"></a>})[<span class="dv">3</span>]</span>
+<span id="cb29-8"><a href="#cb29-8" tabindex="-1"></a><span class="fu">sprintf</span>(<span class="st">&quot;Serial Version CPU time: %.2f Seconds&quot;</span>, cputime_ser)</span></code></pre></div>
+<pre><code>## [1] &quot;Serial Version CPU time: 0.00 Seconds&quot;</code></pre>
+<div class="sourceCode" id="cb31"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb31-1"><a href="#cb31-1" tabindex="-1"></a><span class="co"># Parallel Version</span></span>
+<span id="cb31-2"><a href="#cb31-2" tabindex="-1"></a><span class="co"># initialize parallel cluster. Here, we use 4 cores</span></span>
+<span id="cb31-3"><a href="#cb31-3" tabindex="-1"></a>cl <span class="ot">=</span> <span class="fu">makeCluster</span>(<span class="dv">4</span>)</span>
+<span id="cb31-4"><a href="#cb31-4" tabindex="-1"></a><span class="co"># sets up the cluster for the foreach loop</span></span>
+<span id="cb31-5"><a href="#cb31-5" tabindex="-1"></a><span class="fu">registerDoParallel</span>(cl)</span>
+<span id="cb31-6"><a href="#cb31-6" tabindex="-1"></a>cputime_par <span class="ot">&lt;-</span> <span class="fu">system.time</span>({</span>
+<span id="cb31-7"><a href="#cb31-7" tabindex="-1"></a>  result <span class="ot">&lt;-</span> <span class="fu">foreach</span> (<span class="at">i =</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">20000</span>, <span class="at">.combine =</span> <span class="st">&#39;c&#39;</span>) <span class="sc">%dopar%</span> { </span>
+<span id="cb31-8"><a href="#cb31-8" tabindex="-1"></a>    <span class="fu">sqrt</span>(i)</span>
+<span id="cb31-9"><a href="#cb31-9" tabindex="-1"></a>  }</span>
+<span id="cb31-10"><a href="#cb31-10" tabindex="-1"></a>})[<span class="dv">3</span>] <span class="co"># seconds</span></span>
+<span id="cb31-11"><a href="#cb31-11" tabindex="-1"></a><span class="co"># shutdown parallel cluster</span></span>
+<span id="cb31-12"><a href="#cb31-12" tabindex="-1"></a><span class="fu">stopCluster</span>(cl)</span>
+<span id="cb31-13"><a href="#cb31-13" tabindex="-1"></a><span class="fu">sprintf</span>(<span class="st">&quot;Parallel Version CPU time: %.2f Seconds&quot;</span>, cputime_par)</span></code></pre></div>
+<pre><code>## [1] &quot;Parallel Version CPU time: 1.85 Seconds&quot;</code></pre>
 <ul>
 <li>使用向量運算的執行時間為 0.00 秒</li>
-<li>使用一般 <code>for</code> 迴圈執行時間為 0.02 秒</li>
-<li>使用 4 個執行緒平行運算的執行時間為 2.46
+<li>使用一般 <code>for</code> 迴圈執行時間為 0.00 秒</li>
+<li>使用 4 個執行緒平行運算的執行時間為 1.85
 秒（回想課程說明為什麼比較慢？）</li>
 </ul>
 </div>
@@ -380,13 +392,13 @@ Process ID 執行。</p>
 教材內容，嘗試以平行運算進行模型超參數訓練。</p>
 <p>以信用卡資料作為範例，讀取資料並針對類別型變數，在 R
 中請自行將欄位更改為 <code>factor</code> 型態。</p>
-<div class="sourceCode" id="cb29"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb29-1"><a href="#cb29-1" tabindex="-1"></a>creUrl <span class="ot">&lt;-</span> <span class="st">&#39;https://raw.githubusercontent.com/PingYangChen/BDA_Course_R_Code/refs/heads/main/sample_data/Credit.csv&#39;</span></span>
-<span id="cb29-2"><a href="#cb29-2" tabindex="-1"></a>creDf <span class="ot">&lt;-</span> <span class="fu">read.csv</span>(creUrl)</span>
-<span id="cb29-3"><a href="#cb29-3" tabindex="-1"></a><span class="co"># Transform categorical variables as factors</span></span>
-<span id="cb29-4"><a href="#cb29-4" tabindex="-1"></a>creDf<span class="sc">$</span>Own <span class="ot">&lt;-</span> <span class="fu">as.factor</span>(creDf<span class="sc">$</span>Own)</span>
-<span id="cb29-5"><a href="#cb29-5" tabindex="-1"></a>creDf<span class="sc">$</span>Student <span class="ot">&lt;-</span> <span class="fu">as.factor</span>(creDf<span class="sc">$</span>Student)</span>
-<span id="cb29-6"><a href="#cb29-6" tabindex="-1"></a>creDf<span class="sc">$</span>Married <span class="ot">&lt;-</span> <span class="fu">as.factor</span>(creDf<span class="sc">$</span>Married)</span>
-<span id="cb29-7"><a href="#cb29-7" tabindex="-1"></a>creDf<span class="sc">$</span>Region <span class="ot">&lt;-</span> <span class="fu">as.factor</span>(creDf<span class="sc">$</span>Region)</span></code></pre></div>
+<div class="sourceCode" id="cb33"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb33-1"><a href="#cb33-1" tabindex="-1"></a>creUrl <span class="ot">&lt;-</span> <span class="st">&#39;https://raw.githubusercontent.com/PingYangChen/BDA_Course_R_Code/refs/heads/main/sample_data/Credit.csv&#39;</span></span>
+<span id="cb33-2"><a href="#cb33-2" tabindex="-1"></a>creDf <span class="ot">&lt;-</span> <span class="fu">read.csv</span>(creUrl)</span>
+<span id="cb33-3"><a href="#cb33-3" tabindex="-1"></a><span class="co"># Transform categorical variables as factors</span></span>
+<span id="cb33-4"><a href="#cb33-4" tabindex="-1"></a>creDf<span class="sc">$</span>Own <span class="ot">&lt;-</span> <span class="fu">as.factor</span>(creDf<span class="sc">$</span>Own)</span>
+<span id="cb33-5"><a href="#cb33-5" tabindex="-1"></a>creDf<span class="sc">$</span>Student <span class="ot">&lt;-</span> <span class="fu">as.factor</span>(creDf<span class="sc">$</span>Student)</span>
+<span id="cb33-6"><a href="#cb33-6" tabindex="-1"></a>creDf<span class="sc">$</span>Married <span class="ot">&lt;-</span> <span class="fu">as.factor</span>(creDf<span class="sc">$</span>Married)</span>
+<span id="cb33-7"><a href="#cb33-7" tabindex="-1"></a>creDf<span class="sc">$</span>Region <span class="ot">&lt;-</span> <span class="fu">as.factor</span>(creDf<span class="sc">$</span>Region)</span></code></pre></div>
 <p>先將資料整理成 <code>glmnet</code>
 所需格式：<code>model.matrix</code>。</p>
 <ul>
@@ -394,86 +406,86 @@ Process ID 執行。</p>
 <li>解釋變數則透過 <code>model.matrix</code> 函數與 R
 模型語法快速整理<strong>（記得刪除截距項）</strong>。</li>
 </ul>
-<div class="sourceCode" id="cb30"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb30-1"><a href="#cb30-1" tabindex="-1"></a><span class="co"># Create Response Variable</span></span>
-<span id="cb30-2"><a href="#cb30-2" tabindex="-1"></a>y <span class="ot">&lt;-</span> creDf<span class="sc">$</span>Balance</span>
-<span id="cb30-3"><a href="#cb30-3" tabindex="-1"></a><span class="co"># Create model matrix</span></span>
-<span id="cb30-4"><a href="#cb30-4" tabindex="-1"></a>modelmat <span class="ot">&lt;-</span> <span class="fu">model.matrix</span>(Balance <span class="sc">~</span> ., <span class="at">data =</span> creDf)[,<span class="sc">-</span><span class="dv">1</span>] <span class="co"># Remove intercept part</span></span></code></pre></div>
+<div class="sourceCode" id="cb34"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb34-1"><a href="#cb34-1" tabindex="-1"></a><span class="co"># Create Response Variable</span></span>
+<span id="cb34-2"><a href="#cb34-2" tabindex="-1"></a>y <span class="ot">&lt;-</span> creDf<span class="sc">$</span>Balance</span>
+<span id="cb34-3"><a href="#cb34-3" tabindex="-1"></a><span class="co"># Create model matrix</span></span>
+<span id="cb34-4"><a href="#cb34-4" tabindex="-1"></a>modelmat <span class="ot">&lt;-</span> <span class="fu">model.matrix</span>(Balance <span class="sc">~</span> ., <span class="at">data =</span> creDf)[,<span class="sc">-</span><span class="dv">1</span>] <span class="co"># Remove intercept part</span></span></code></pre></div>
 <p>針對 Elastic Net Regression 的兩種超參數 <code>alpha</code> 及
 <code>lambda</code>，使用交互驗證找出最佳超參數組合。</p>
 <ol style="list-style-type: decimal">
 <li>準備超參數集</li>
 </ol>
-<div class="sourceCode" id="cb31"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb31-1"><a href="#cb31-1" tabindex="-1"></a><span class="co"># tuning sets of alpha and lambda</span></span>
-<span id="cb31-2"><a href="#cb31-2" tabindex="-1"></a>alpha_set <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="fl">0.3</span>, <span class="fl">0.5</span>, <span class="fl">0.7</span>)</span>
-<span id="cb31-3"><a href="#cb31-3" tabindex="-1"></a>lambda_set <span class="ot">&lt;-</span> <span class="fu">exp</span>(<span class="fu">seq</span>(<span class="sc">-</span><span class="dv">3</span>, <span class="dv">1</span>, <span class="at">length =</span> <span class="dv">50</span>))</span>
-<span id="cb31-4"><a href="#cb31-4" tabindex="-1"></a><span class="co"># create a 150x2 matrix of all candidates of alpha and lambda values</span></span>
-<span id="cb31-5"><a href="#cb31-5" tabindex="-1"></a>param_cand <span class="ot">&lt;-</span> <span class="fu">cbind</span>(</span>
-<span id="cb31-6"><a href="#cb31-6" tabindex="-1"></a>  <span class="fu">rep</span>(alpha_set, <span class="at">time =</span> <span class="fu">length</span>(lambda_set)),</span>
-<span id="cb31-7"><a href="#cb31-7" tabindex="-1"></a>  <span class="fu">rep</span>(lambda_set, <span class="at">each =</span> <span class="fu">length</span>(alpha_set))</span>
-<span id="cb31-8"><a href="#cb31-8" tabindex="-1"></a>)</span></code></pre></div>
+<div class="sourceCode" id="cb35"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb35-1"><a href="#cb35-1" tabindex="-1"></a><span class="co"># tuning sets of alpha and lambda</span></span>
+<span id="cb35-2"><a href="#cb35-2" tabindex="-1"></a>alpha_set <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="fl">0.3</span>, <span class="fl">0.5</span>, <span class="fl">0.7</span>)</span>
+<span id="cb35-3"><a href="#cb35-3" tabindex="-1"></a>lambda_set <span class="ot">&lt;-</span> <span class="fu">exp</span>(<span class="fu">seq</span>(<span class="sc">-</span><span class="dv">3</span>, <span class="dv">1</span>, <span class="at">length =</span> <span class="dv">50</span>))</span>
+<span id="cb35-4"><a href="#cb35-4" tabindex="-1"></a><span class="co"># create a 150x2 matrix of all candidates of alpha and lambda values</span></span>
+<span id="cb35-5"><a href="#cb35-5" tabindex="-1"></a>param_cand <span class="ot">&lt;-</span> <span class="fu">cbind</span>(</span>
+<span id="cb35-6"><a href="#cb35-6" tabindex="-1"></a>  <span class="fu">rep</span>(alpha_set, <span class="at">time =</span> <span class="fu">length</span>(lambda_set)),</span>
+<span id="cb35-7"><a href="#cb35-7" tabindex="-1"></a>  <span class="fu">rep</span>(lambda_set, <span class="at">each =</span> <span class="fu">length</span>(alpha_set))</span>
+<span id="cb35-8"><a href="#cb35-8" tabindex="-1"></a>)</span></code></pre></div>
 <ol start="2" style="list-style-type: decimal">
 <li>切分訓練測試集</li>
 </ol>
-<div class="sourceCode" id="cb32"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb32-1"><a href="#cb32-1" tabindex="-1"></a><span class="fu">library</span>(pracma)</span>
-<span id="cb32-2"><a href="#cb32-2" tabindex="-1"></a><span class="co"># Implement 10-fold CV</span></span>
-<span id="cb32-3"><a href="#cb32-3" tabindex="-1"></a>n <span class="ot">&lt;-</span> <span class="fu">length</span>(y)</span>
-<span id="cb32-4"><a href="#cb32-4" tabindex="-1"></a>nfold <span class="ot">&lt;-</span> <span class="dv">10</span> <span class="co"># set number of folds</span></span>
-<span id="cb32-5"><a href="#cb32-5" tabindex="-1"></a><span class="co"># Always remember to set seed before actions with randomness involved!!</span></span>
-<span id="cb32-6"><a href="#cb32-6" tabindex="-1"></a>seed <span class="ot">&lt;-</span> <span class="dv">1</span></span>
-<span id="cb32-7"><a href="#cb32-7" tabindex="-1"></a><span class="fu">set.seed</span>(seed)</span>
-<span id="cb32-8"><a href="#cb32-8" tabindex="-1"></a><span class="co"># Create belonging folds for each data point</span></span>
-<span id="cb32-9"><a href="#cb32-9" tabindex="-1"></a><span class="co"># by randomly permuting the index of folds.</span></span>
-<span id="cb32-10"><a href="#cb32-10" tabindex="-1"></a>folds <span class="ot">&lt;-</span> pracma<span class="sc">::</span><span class="fu">randperm</span>( </span>
-<span id="cb32-11"><a href="#cb32-11" tabindex="-1"></a>  <span class="fu">rep</span>(<span class="dv">1</span><span class="sc">:</span>nfold, <span class="at">time =</span> <span class="fu">ceiling</span>(n<span class="sc">/</span>nfold))[<span class="dv">1</span><span class="sc">:</span>n]</span>
-<span id="cb32-12"><a href="#cb32-12" tabindex="-1"></a>)</span></code></pre></div>
+<div class="sourceCode" id="cb36"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb36-1"><a href="#cb36-1" tabindex="-1"></a><span class="fu">library</span>(pracma)</span>
+<span id="cb36-2"><a href="#cb36-2" tabindex="-1"></a><span class="co"># Implement 10-fold CV</span></span>
+<span id="cb36-3"><a href="#cb36-3" tabindex="-1"></a>n <span class="ot">&lt;-</span> <span class="fu">length</span>(y)</span>
+<span id="cb36-4"><a href="#cb36-4" tabindex="-1"></a>nfold <span class="ot">&lt;-</span> <span class="dv">10</span> <span class="co"># set number of folds</span></span>
+<span id="cb36-5"><a href="#cb36-5" tabindex="-1"></a><span class="co"># Always remember to set seed before actions with randomness involved!!</span></span>
+<span id="cb36-6"><a href="#cb36-6" tabindex="-1"></a>seed <span class="ot">&lt;-</span> <span class="dv">1</span></span>
+<span id="cb36-7"><a href="#cb36-7" tabindex="-1"></a><span class="fu">set.seed</span>(seed)</span>
+<span id="cb36-8"><a href="#cb36-8" tabindex="-1"></a><span class="co"># Create belonging folds for each data point</span></span>
+<span id="cb36-9"><a href="#cb36-9" tabindex="-1"></a><span class="co"># by randomly permuting the index of folds.</span></span>
+<span id="cb36-10"><a href="#cb36-10" tabindex="-1"></a>folds <span class="ot">&lt;-</span> pracma<span class="sc">::</span><span class="fu">randperm</span>( </span>
+<span id="cb36-11"><a href="#cb36-11" tabindex="-1"></a>  <span class="fu">rep</span>(<span class="dv">1</span><span class="sc">:</span>nfold, <span class="at">time =</span> <span class="fu">ceiling</span>(n<span class="sc">/</span>nfold))[<span class="dv">1</span><span class="sc">:</span>n]</span>
+<span id="cb36-12"><a href="#cb36-12" tabindex="-1"></a>)</span></code></pre></div>
 <ol start="3" style="list-style-type: decimal">
 <li>執行交互驗證並計時</li>
 </ol>
-<div class="sourceCode" id="cb33"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb33-1"><a href="#cb33-1" tabindex="-1"></a><span class="fu">library</span>(glmnet)</span>
-<span id="cb33-2"><a href="#cb33-2" tabindex="-1"></a><span class="co"># Create space for storing MSE values of all parameter candidates</span></span>
-<span id="cb33-3"><a href="#cb33-3" tabindex="-1"></a>mse_cv_tune_ser <span class="ot">&lt;-</span> <span class="fu">numeric</span>(<span class="fu">nrow</span>(param_cand))</span>
-<span id="cb33-4"><a href="#cb33-4" tabindex="-1"></a></span>
-<span id="cb33-5"><a href="#cb33-5" tabindex="-1"></a><span class="co"># Start parameter tuning</span></span>
-<span id="cb33-6"><a href="#cb33-6" tabindex="-1"></a>cputime_cv_serial <span class="ot">&lt;-</span> <span class="fu">system.time</span>({</span>
-<span id="cb33-7"><a href="#cb33-7" tabindex="-1"></a>  </span>
-<span id="cb33-8"><a href="#cb33-8" tabindex="-1"></a>  <span class="cf">for</span> (ipar <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span><span class="fu">nrow</span>(param_cand)) {</span>
-<span id="cb33-9"><a href="#cb33-9" tabindex="-1"></a>    <span class="co"># Create empty vector for storing predicted values</span></span>
-<span id="cb33-10"><a href="#cb33-10" tabindex="-1"></a>    yhat_cv <span class="ot">&lt;-</span> <span class="fu">numeric</span>(<span class="fu">length</span>(y))</span>
-<span id="cb33-11"><a href="#cb33-11" tabindex="-1"></a>    <span class="co"># Start 10-fold CV</span></span>
-<span id="cb33-12"><a href="#cb33-12" tabindex="-1"></a>    <span class="cf">for</span> (k <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span>nfold) {</span>
-<span id="cb33-13"><a href="#cb33-13" tabindex="-1"></a>      <span class="co"># Prepare training data</span></span>
-<span id="cb33-14"><a href="#cb33-14" tabindex="-1"></a>      train_id <span class="ot">&lt;-</span> <span class="fu">which</span>(folds <span class="sc">!=</span> k)</span>
-<span id="cb33-15"><a href="#cb33-15" tabindex="-1"></a>      train_x <span class="ot">&lt;-</span> modelmat[train_id,]</span>
-<span id="cb33-16"><a href="#cb33-16" tabindex="-1"></a>      train_y <span class="ot">&lt;-</span> y[train_id]</span>
-<span id="cb33-17"><a href="#cb33-17" tabindex="-1"></a>      <span class="co"># Fit EN model with training data</span></span>
-<span id="cb33-18"><a href="#cb33-18" tabindex="-1"></a>      en_fold <span class="ot">&lt;-</span> <span class="fu">glmnet</span>(train_x, train_y, <span class="at">family =</span> <span class="st">&quot;gaussian&quot;</span>, </span>
-<span id="cb33-19"><a href="#cb33-19" tabindex="-1"></a>                        <span class="at">alpha =</span> param_cand[ipar,<span class="dv">1</span>], <span class="at">lambda =</span> param_cand[ipar,<span class="dv">2</span>])</span>
-<span id="cb33-20"><a href="#cb33-20" tabindex="-1"></a>      <span class="co"># Prepare testing data</span></span>
-<span id="cb33-21"><a href="#cb33-21" tabindex="-1"></a>      test_id <span class="ot">&lt;-</span> <span class="fu">which</span>(folds <span class="sc">==</span> k)</span>
-<span id="cb33-22"><a href="#cb33-22" tabindex="-1"></a>      test_x <span class="ot">&lt;-</span> modelmat[test_id,]</span>
-<span id="cb33-23"><a href="#cb33-23" tabindex="-1"></a>      <span class="co"># Predict using EN model with testing data</span></span>
-<span id="cb33-24"><a href="#cb33-24" tabindex="-1"></a>      yhat_fold <span class="ot">&lt;-</span> <span class="fu">predict</span>(en_fold, test_x) </span>
-<span id="cb33-25"><a href="#cb33-25" tabindex="-1"></a>      <span class="co"># Allocate those predicted values into the corresponding fold</span></span>
-<span id="cb33-26"><a href="#cb33-26" tabindex="-1"></a>      yhat_cv[test_id] <span class="ot">&lt;-</span> yhat_fold</span>
-<span id="cb33-27"><a href="#cb33-27" tabindex="-1"></a>    }</span>
-<span id="cb33-28"><a href="#cb33-28" tabindex="-1"></a>    <span class="co"># Compute MSE of the cross-validation</span></span>
-<span id="cb33-29"><a href="#cb33-29" tabindex="-1"></a>    mse_cv <span class="ot">&lt;-</span> <span class="fu">mean</span>((y <span class="sc">-</span> yhat_cv)<span class="sc">^</span><span class="dv">2</span>)</span>
-<span id="cb33-30"><a href="#cb33-30" tabindex="-1"></a>    mse_cv_tune_ser[ipar] <span class="ot">&lt;-</span> mse_cv</span>
-<span id="cb33-31"><a href="#cb33-31" tabindex="-1"></a>  }</span>
-<span id="cb33-32"><a href="#cb33-32" tabindex="-1"></a>  </span>
-<span id="cb33-33"><a href="#cb33-33" tabindex="-1"></a>})[<span class="dv">3</span>]</span></code></pre></div>
+<div class="sourceCode" id="cb37"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb37-1"><a href="#cb37-1" tabindex="-1"></a><span class="fu">library</span>(glmnet)</span>
+<span id="cb37-2"><a href="#cb37-2" tabindex="-1"></a><span class="co"># Create space for storing MSE values of all parameter candidates</span></span>
+<span id="cb37-3"><a href="#cb37-3" tabindex="-1"></a>mse_cv_tune_ser <span class="ot">&lt;-</span> <span class="fu">numeric</span>(<span class="fu">nrow</span>(param_cand))</span>
+<span id="cb37-4"><a href="#cb37-4" tabindex="-1"></a></span>
+<span id="cb37-5"><a href="#cb37-5" tabindex="-1"></a><span class="co"># Start parameter tuning</span></span>
+<span id="cb37-6"><a href="#cb37-6" tabindex="-1"></a>cputime_cv_serial <span class="ot">&lt;-</span> <span class="fu">system.time</span>({</span>
+<span id="cb37-7"><a href="#cb37-7" tabindex="-1"></a>  </span>
+<span id="cb37-8"><a href="#cb37-8" tabindex="-1"></a>  <span class="cf">for</span> (ipar <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span><span class="fu">nrow</span>(param_cand)) {</span>
+<span id="cb37-9"><a href="#cb37-9" tabindex="-1"></a>    <span class="co"># Create empty vector for storing predicted values</span></span>
+<span id="cb37-10"><a href="#cb37-10" tabindex="-1"></a>    yhat_cv <span class="ot">&lt;-</span> <span class="fu">numeric</span>(<span class="fu">length</span>(y))</span>
+<span id="cb37-11"><a href="#cb37-11" tabindex="-1"></a>    <span class="co"># Start 10-fold CV</span></span>
+<span id="cb37-12"><a href="#cb37-12" tabindex="-1"></a>    <span class="cf">for</span> (k <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span>nfold) {</span>
+<span id="cb37-13"><a href="#cb37-13" tabindex="-1"></a>      <span class="co"># Prepare training data</span></span>
+<span id="cb37-14"><a href="#cb37-14" tabindex="-1"></a>      train_id <span class="ot">&lt;-</span> <span class="fu">which</span>(folds <span class="sc">!=</span> k)</span>
+<span id="cb37-15"><a href="#cb37-15" tabindex="-1"></a>      train_x <span class="ot">&lt;-</span> modelmat[train_id,]</span>
+<span id="cb37-16"><a href="#cb37-16" tabindex="-1"></a>      train_y <span class="ot">&lt;-</span> y[train_id]</span>
+<span id="cb37-17"><a href="#cb37-17" tabindex="-1"></a>      <span class="co"># Fit EN model with training data</span></span>
+<span id="cb37-18"><a href="#cb37-18" tabindex="-1"></a>      en_fold <span class="ot">&lt;-</span> <span class="fu">glmnet</span>(train_x, train_y, <span class="at">family =</span> <span class="st">&quot;gaussian&quot;</span>, </span>
+<span id="cb37-19"><a href="#cb37-19" tabindex="-1"></a>                        <span class="at">alpha =</span> param_cand[ipar,<span class="dv">1</span>], <span class="at">lambda =</span> param_cand[ipar,<span class="dv">2</span>])</span>
+<span id="cb37-20"><a href="#cb37-20" tabindex="-1"></a>      <span class="co"># Prepare testing data</span></span>
+<span id="cb37-21"><a href="#cb37-21" tabindex="-1"></a>      test_id <span class="ot">&lt;-</span> <span class="fu">which</span>(folds <span class="sc">==</span> k)</span>
+<span id="cb37-22"><a href="#cb37-22" tabindex="-1"></a>      test_x <span class="ot">&lt;-</span> modelmat[test_id,]</span>
+<span id="cb37-23"><a href="#cb37-23" tabindex="-1"></a>      <span class="co"># Predict using EN model with testing data</span></span>
+<span id="cb37-24"><a href="#cb37-24" tabindex="-1"></a>      yhat_fold <span class="ot">&lt;-</span> <span class="fu">predict</span>(en_fold, test_x) </span>
+<span id="cb37-25"><a href="#cb37-25" tabindex="-1"></a>      <span class="co"># Allocate those predicted values into the corresponding fold</span></span>
+<span id="cb37-26"><a href="#cb37-26" tabindex="-1"></a>      yhat_cv[test_id] <span class="ot">&lt;-</span> yhat_fold</span>
+<span id="cb37-27"><a href="#cb37-27" tabindex="-1"></a>    }</span>
+<span id="cb37-28"><a href="#cb37-28" tabindex="-1"></a>    <span class="co"># Compute MSE of the cross-validation</span></span>
+<span id="cb37-29"><a href="#cb37-29" tabindex="-1"></a>    mse_cv <span class="ot">&lt;-</span> <span class="fu">mean</span>((y <span class="sc">-</span> yhat_cv)<span class="sc">^</span><span class="dv">2</span>)</span>
+<span id="cb37-30"><a href="#cb37-30" tabindex="-1"></a>    mse_cv_tune_ser[ipar] <span class="ot">&lt;-</span> mse_cv</span>
+<span id="cb37-31"><a href="#cb37-31" tabindex="-1"></a>  }</span>
+<span id="cb37-32"><a href="#cb37-32" tabindex="-1"></a>  </span>
+<span id="cb37-33"><a href="#cb37-33" tabindex="-1"></a>})[<span class="dv">3</span>]</span></code></pre></div>
 <ol start="4" style="list-style-type: decimal">
 <li>檢視最佳超參數</li>
 </ol>
-<div class="sourceCode" id="cb34"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb34-1"><a href="#cb34-1" tabindex="-1"></a>best_param <span class="ot">&lt;-</span> param_cand[<span class="fu">which.min</span>(mse_cv_tune_ser),]</span>
-<span id="cb34-2"><a href="#cb34-2" tabindex="-1"></a><span class="fu">sprintf</span>(<span class="st">&quot;Min. CV = %.2f, Best alpha = %.1f, lambda = %f&quot;</span>, </span>
-<span id="cb34-3"><a href="#cb34-3" tabindex="-1"></a>        <span class="fu">min</span>(mse_cv_tune_ser), best_param[<span class="dv">1</span>], best_param[<span class="dv">2</span>])</span></code></pre></div>
+<div class="sourceCode" id="cb38"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb38-1"><a href="#cb38-1" tabindex="-1"></a>best_param <span class="ot">&lt;-</span> param_cand[<span class="fu">which.min</span>(mse_cv_tune_ser),]</span>
+<span id="cb38-2"><a href="#cb38-2" tabindex="-1"></a><span class="fu">sprintf</span>(<span class="st">&quot;Min. CV = %.2f, Best alpha = %.1f, lambda = %f&quot;</span>, </span>
+<span id="cb38-3"><a href="#cb38-3" tabindex="-1"></a>        <span class="fu">min</span>(mse_cv_tune_ser), best_param[<span class="dv">1</span>], best_param[<span class="dv">2</span>])</span></code></pre></div>
 <pre><code>## [1] &quot;Min. CV = 9999.49, Best alpha = 0.3, lambda = 0.299967&quot;</code></pre>
 <ol start="5" style="list-style-type: decimal">
 <li>檢視計算時間</li>
 </ol>
-<div class="sourceCode" id="cb36"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb36-1"><a href="#cb36-1" tabindex="-1"></a><span class="fu">sprintf</span>(<span class="st">&quot;Serial Cross-validation CPU time: %.2f Seconds&quot;</span>, cputime_cv_serial)</span></code></pre></div>
-<pre><code>## [1] &quot;Serial Cross-validation CPU time: 1.06 Seconds&quot;</code></pre>
+<div class="sourceCode" id="cb40"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb40-1"><a href="#cb40-1" tabindex="-1"></a><span class="fu">sprintf</span>(<span class="st">&quot;Serial Cross-validation CPU time: %.2f Seconds&quot;</span>, cputime_cv_serial)</span></code></pre></div>
+<pre><code>## [1] &quot;Serial Cross-validation CPU time: 0.88 Seconds&quot;</code></pre>
 </div>
 <div id="homework-parallelizing-cross-validation-tasks-in-parameter-tuning" class="section level2">
 <h2>Homework: Parallelizing Cross-validation Tasks in Parameter

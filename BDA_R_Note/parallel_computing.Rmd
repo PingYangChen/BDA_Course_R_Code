@@ -41,9 +41,9 @@ cputime <- system.time({
 以下用個簡單的範例來說明：**輸出大型整數矩陣每列的最大值**
 
 ```{r createLargeMatrix, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE} 
-n <- 1e7 # nrows
+n <- 1e6 # nrows
 p <- 10  # ncols
-set.seed(2025)
+set.seed(2026)
 A <- matrix(sample(1:100, n*p, replace = TRUE), n, p)
 ```
 
@@ -91,6 +91,18 @@ sprintf("Method 4 CPU time: %.2f Seconds", t4)
 
 ```{r tvali, echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
 all((res1 - res2) == 0) & all((res1 - res3) == 0) & all((res1 - res4) == 0) 
+```
+
+計算 Speed-up (數字大於 1 表示 Column 顯示的方法優於 Row 顯示的方法)
+
+```{r tspdup, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE}
+spdv <- c(t1, t2, t3, t4); names(spdv) <- sprintf("Method %d", 1:4)
+spdup <- spdv %*% t(1/spdv)
+dimnames(spdup) <- list(sprintf("Method %d", 1:4), sprintf("Method %d", 1:4))
+cat("CPU times (seconds):")
+print(spdv)
+cat("Speed-up:")
+print(round(spdup, 3))
 ```
 
 # Parallel Computing in R
